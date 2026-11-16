@@ -1,13 +1,13 @@
-# FloorFlow read-only API (M2)
+# FloorFlow API
 
 Base URL for local development: `http://127.0.0.1:3000`.
-All examples below are complete responses from the unchanged M1 seed.
+The browsing examples below are complete responses from the unchanged M1 seed.
 Successful requests return HTTP 200 and JSON. Collections are plain arrays;
 single resources are plain objects. Timestamps are ISO 8601 UTC strings.
 
 All prices and totals are **SEK excluding VAT**. Monetary values are JSON
 strings with two decimal places, and quantities are strings with three decimal
-places. IDs are JSON integers. There is no authentication or write API in M2.
+places. IDs are JSON integers. There is no authentication or customer/order write API.
 
 ## GET /api/customers
 
@@ -227,10 +227,89 @@ reports must filter to `completed`; these browsing endpoints are not sales
 reports. Historical item prices are used even when catalog prices change.
 
 All input IDs use `$1` SQL parameters. Explicit column lists avoid exposing
-unneeded fields. No pagination, writes, ORM, service layer, or new dependency
-is introduced. Express 5 forwards rejected async handlers to the final error
+unneeded fields. The browsing endpoints introduce no pagination, writes, ORM,
+or service layer. Express 5 forwards rejected async handlers to the final error
 middleware, so individual routes do not repeat `try`/`catch` blocks.
 
 References: [Express error handling](https://expressjs.com/en/guide/error-handling/),
 [node-postgres parameterized queries](https://node-postgres.com/features/queries),
 and [PostgreSQL numeric rounding](https://www.postgresql.org/docs/18/functions-math.html).
+
+## POST /api/assistant/chat (M4)
+
+Generates and validates a read-only database query. This POST endpoint creates
+no customer or order data. It needs separate AI database credentials and a
+configured Azure Foundry deployment; otherwise it returns an explicit 503.
+
+Request (`Content-Type: application/json`):
+
+```json
+{"message":"How much have we sold in total?"}
+```
+
+`message` must be the only property, a nonblank string of at most 1000 characters.
+The JSON body limit is 4 KiB. Conversation history, raw SQL, and client-side
+configuration are not accepted.
+
+Representative successful response for a correct query against the seed:
+
+```json
+{
+  "answer": "Total sales: 285,415.00 SEK. Amounts are in SEK, excluding VAT.",
+  "sql": "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_sales_sek FROM public.orders o JOIN public.order_items oi ON oi.order_id = o.id WHERE o.status = $1 LIMIT 51",
+  "columns": ["total_sales_sek"],
+  "results": [{"total_sales_sek":"285415.00"}],
+  "truncated": false
+}
+```
+
+The SQL formatting/aliases depend on the generated query. The response above is
+illustrative, **not a verified live Azure response**. Mocked generation and real
+PostgreSQL tests verify this completed-sales value. SQL in the response is the
+validated, regenerated, bounded SQL that was executed. String values are bound
+separately and are not included in this SQL field. `columns` defines the result
+table order. Numeric values remain strings; the browser performs no monetary
+arithmetic. The English answer is built directly from the rows, without another
+model call. There are at most 50 displayed rows; `truncated` reports an extra row.
+
+A question the schema cannot answer returns HTTP 200 with an explanation:
+
+```json
+{
+  "answer":"That question cannot be answered from the available customer, order and article records.",
+  "sql":null,
+  "columns":[],
+  "results":[],
+  "truncated":false
+}
+```
+
+An empty query result has `results: []` and the answer "No matching records were
+found." An aggregate may legitimately return zero instead. Missing Azure
+configuration does not produce either response; it returns HTTP 503.
+
+Errors use the existing `{ "error": "safe public message" }` shape:
+
+| Status | Meaning |
+| --- | --- |
+| 400 | Missing/invalid message or malformed JSON |
+| 413 | Request body too large |
+| 415 | JSON content type required |
+| 422 | SQL cannot be verified, result type is unsupported, or result exceeds the byte limit |
+| 429 | Per-IP/global request budget reached, or another request is active; includes `Retry-After` |
+| 502 | Malformed, refused, or truncated model output |
+| 503 | Not configured, provider authentication/unavailability, unsafe DB permissions, or database failure |
+| 504 | Model, database statement, or database lock timeout |
+| 500 | Other unexpected internal failure |
+
+Successful responses set `Cache-Control: no-store`. Provider authentication
+errors are service errors, not a request to authenticate the browser user. Raw
+provider/database messages, credentials, and stack traces are not returned or
+logged by the assistant. Model retries are disabled. Limits are 5 accepted
+requests/IP/minute, 30/process/hour, and one active request at a time. The local
+app does not trust forwarded IP headers. Counters reset on process restart.
+
+See [ASSISTANT.md](ASSISTANT.md) for SQL restrictions, role setup, execution
+limits, privacy boundaries, mocked versus real verification, and the explicit
+approval required before any paid Azure test. Structural validation does not
+guarantee the generated query's business meaning is correct.

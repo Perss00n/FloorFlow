@@ -1,5 +1,6 @@
 import { createApp } from './app.js';
 import { pool } from './db.js';
+import { configureAssistant } from './assistant/config.js';
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -15,7 +16,8 @@ try {
   process.exit(1);
 }
 
-const app = createApp(pool);
+const configured = configureAssistant();
+const app = createApp(pool, configured.assistant);
 const server = app.listen(port, '127.0.0.1', () => {
   console.log(`FloorFlow is running at http://127.0.0.1:${port}`);
 });
@@ -23,6 +25,7 @@ const server = app.listen(port, '127.0.0.1', () => {
 server.on('error', async (error) => {
   console.error('Cannot start the HTTP server:', error.message);
   await pool.end();
+  await configured.close();
   process.exitCode = 1;
 });
 
@@ -30,6 +33,7 @@ server.on('error', async (error) => {
 function shutdown() {
   server.close(async () => {
     await pool.end();
+    await configured.close();
   });
 }
 

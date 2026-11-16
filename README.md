@@ -2,20 +2,24 @@
 
 FloorFlow is a small application inspired by flooring contracting. It will show
 customers, orders, materials, and labor, with an AI assistant for sales questions.
-This repository implements **M1 through M3**: local PostgreSQL, schema, seed data,
+This repository implements **M1 through M4**: local PostgreSQL, schema, seed data,
 an Express health endpoint, a read-only REST API, and a responsive frontend for
-browsing customers and orders. The home page reserves a clearly labelled
-"Coming soon" section for the future AI assistant; AI integration is not implemented.
+browsing customers and orders. The home page includes an Azure Foundry database
+assistant with structural SQL validation and a separate read-only login.
+**Real Azure integration has not been verified:** local tests use model mocks
+and actual PostgreSQL, without paid API calls. Missing configuration returns 503.
 
 ## Technologies and prerequisites
 
 - Node.js **24.x** and npm.
 - Express 5 and the `pg` PostgreSQL driver, using plain JavaScript and ES modules.
+- The official `openai` JavaScript SDK for Azure Foundry's OpenAI-compatible v1 API.
+- `pgsql-ast-parser` to validate and regenerate a restricted SELECT syntax tree.
 - Docker Desktop running Linux containers, with Docker Compose v2 or newer.
 - The official `postgres:18` image. The major version is explicit; the tag can
   receive minor updates. Major upgrades require a separate data migration.
 
-Only `express` and `pg` are direct dependencies. Node provides environment-file
+These four packages are the only direct dependencies. Node provides environment-file
 loading, watch mode, HTTP test requests, and the test runner; no extra packages
 are needed for them.
 
@@ -36,7 +40,10 @@ FloorFlow/
 │   │   └── 02-seed.sql
 │   └── verify.sql
 ├── docs/
-│   └── API.md
+│   ├── API.md
+│   └── ASSISTANT.md
+├── scripts/
+│   └── setup-assistant-db.js
 ├── public/
 │   ├── index.html
 │   ├── customer.html
@@ -46,6 +53,7 @@ FloorFlow/
 │   │   └── styles.css
 │   └── js/
 │       ├── api.js
+│       ├── assistant.js
 │       ├── customers.js
 │       ├── customer.js
 │       ├── order.js
@@ -54,13 +62,25 @@ FloorFlow/
 ├── src/
 │   ├── app.js
 │   ├── db.js
+│   ├── assistant/
+│   │   ├── assistant.js
+│   │   ├── config.js
+│   │   ├── database.js
+│   │   ├── errors.js
+│   │   ├── model.js
+│   │   ├── schema.js
+│   │   └── sql.js
 │   ├── routes/
+│   │   ├── assistant.js
 │   │   ├── customers.js
 │   │   ├── orders.js
 │   │   └── validate-id.js
 │   └── server.js
 └── test/
     ├── api.test.js
+    ├── assistant-integration.test.js
+    ├── assistant-model.test.js
+    ├── assistant-sql.test.js
     ├── database.test.js
     ├── format.test.js
     ├── frontend-api.test.js
@@ -79,7 +99,8 @@ Copy-Item .env.example .env
 ```
 
 On macOS/Linux, use `cp .env.example .env`. Do not overwrite an existing `.env`.
-Edit `.env` and replace `PGPASSWORD` with your own local development password.
+Edit `.env` and replace `PGPASSWORD` and `AI_PGPASSWORD` with different local
+development passwords. Keep `AI_PGUSER=floorflow_ai`. Azure values can stay blank.
 The other example values are usable defaults:
 
 | Variable | Purpose |
@@ -90,6 +111,10 @@ The other example values are usable defaults:
 | `PGDATABASE` | Local database name |
 | `PGUSER` | Local database username |
 | `PGPASSWORD` | Local database password; never commit it |
+| `AI_PGUSER` / `AI_PGPASSWORD` | Separate read-only assistant login; configure with the setup command below |
+| `AZURE_FOUNDRY_ENDPOINT` | Full Azure resource endpoint ending in `/openai/v1/`; blank disables AI |
+| `AZURE_FOUNDRY_MODEL` | Actual Azure model deployment name |
+| `AZURE_FOUNDRY_API_KEY` | Azure resource API key, server only; blank disables AI |
 
 Compose and Node both read `.env`. Compose maps the `PG*` values to the official
 image's `POSTGRES_*` initialization variables. Existing shell variables override
@@ -101,6 +126,7 @@ docker compose config --quiet
 docker compose pull db
 docker compose up -d --wait
 npm ci
+npm run db:assistant:setup
 npm start
 ```
 
@@ -125,7 +151,7 @@ needed. Start with the commands above; no separate frontend server is required.
 
 | Page | Local URL | Use |
 | --- | --- | --- |
-| Customer overview | <http://127.0.0.1:3000/> | Customer names and contact details, plus the future assistant's location |
+| Customer overview | <http://127.0.0.1:3000/> | Customer names, contact details, and the database assistant |
 | Customer details | <http://127.0.0.1:3000/customer.html?id=1> | Customer contact information and orders, newest first |
 | Order details | <http://127.0.0.1:3000/order.html?id=1> | Customer, status, creation date, articles, agreed prices, and order total |
 
@@ -163,6 +189,42 @@ never sums lines or changes the API's historical prices.
 relative to the application module. Database files, source code, `.env`, and
 Git metadata are outside that directory; dotfiles are ignored. API routes remain
 registered before static middleware, and unknown resources retain the JSON 404.
+
+## AI assistant (M4)
+
+The home page accepts a question and shows the answer, exact result values, and
+a collapsible executed-SQL section. Each question is independent; previous chat
+messages are not sent to the model. API-provided content is always rendered as text.
+
+One Azure model request receives the existing schema file and business rules and
+returns structured SQL. A strict AST allowlist authorizes a small SELECT subset.
+Accepted SQL is regenerated with qualified table names, parameterized string
+values, and a row limit, then executed through the separate restricted pool in
+a read-only transaction. Short database timeouts and memory/temp-file limits
+also constrain the work. The English answer is constructed directly from the
+returned rows, without a second model call or invented figures.
+
+See [ASSISTANT.md](docs/ASSISTANT.md) for the complete flow, exact security
+policy, role setup, limits, limitations, and future approved live testing. See
+[API.md](docs/API.md) for `POST /api/assistant/chat` and its response contract.
+
+Local setup does not require Azure credentials. `npm run db:assistant:setup`
+creates/configures `floorflow_ai` and grants SELECT only on the four application
+tables. It also revokes inherited PUBLIC CREATE/TEMPORARY privileges in this
+dedicated database; the existing owner retains its rights. The command changes
+permissions, not seed data. Run it again after recreating the database volume.
+
+Azure requires an existing resource and a deployed model supporting strict JSON
+schema Chat Completions. Use its full resource v1 URL, actual deployment name,
+and API key. No resource is provisioned by this application. **Do not make a real
+model call until a paid test is explicitly approved.** No such call has been made.
+
+The assistant accepts at most 5 requests/IP/minute and 30/process/hour, with one
+active request and no automatic model retries. These counters reset on restart.
+Structural SQL safety does not prove the model chose the correct interpretation
+or business filters. Inspect the SQL and evaluate the chosen deployment before
+trusting its answers. Unsupported SQL fails closed rather than being repaired
+or retried automatically.
 
 ## Read-only REST API (M2)
 
@@ -220,6 +282,7 @@ It is not needed for a normal restart. Never use this as a production migration.
 ```powershell
 docker compose down --volumes
 docker compose up -d --wait
+npm run db:assistant:setup
 ```
 
 ## Schema and business rules
@@ -272,6 +335,9 @@ M3 adds static page and asset checks, protection against serving internal files,
 exact money and quantity formatting, UTC dates, page-ID validation, and browser
 fetch-helper success/failure checks. These tests run with the same `npm test`
 command and do not require a browser or a new testing framework.
+M4 adds deterministic model/SDK transport tests and real restricted-PostgreSQL
+integration checks. Set the AI database credentials and run the role setup before
+the full suite. Azure credentials remain blank; the tests never make paid calls.
 
 Success and fixture tests use PostgreSQL. Controlled failing databases verify
 safe error responses. HTTP tests choose temporary ports automatically. Fixture
@@ -327,6 +393,16 @@ names were checked through a separate local app using an uncommitted PostgreSQL
 transaction; all fixture changes were rolled back. These interactive browser
 checks are not part of `npm test` and are not a cross-browser accessibility audit.
 
+M4 verification on **2026-11-16**: **230 tests passed**, none failed or skipped,
+including all unchanged 99 M1–M3 tests. New tests cover intercepted SDK requests,
+model mocks, SQL policy attacks, real restricted-role queries and denied writes,
+real statement/lock timeouts, output limits, and request budgets. The five example
+business questions produced the expected seed results using mocked generation.
+Interactive Chrome checks at desktop and mobile sizes verified the unconfigured
+assistant form, explicit service-unavailable response, and restored controls.
+**Real Azure calls and live successful chat rendering remain unverified.** No
+resources were provisioned, no paid calls were made, and seed data is unchanged.
+
 ## Decisions to explain
 
 - `pg.Pool` reuses connections. It is a driver, not an EF Core equivalent:
@@ -357,17 +433,17 @@ for `PG*` variables.
 The server still binds to `127.0.0.1`. Azure will need an appropriate listening
 interface. The `npm start` command still requires a physical `.env` file, while
 Azure App Service will supply environment variables. These settings are kept
-unchanged in M3 and must be addressed and tested in M6. No Azure resources or
+unchanged in M4 and must be addressed and tested in M6. No Azure resources or
 deployment workflows have been created.
 
 ## Milestones
 
 1. **M1:** Project setup, PostgreSQL, schema, and seed data (complete).
 2. **M2:** Read-only REST API and data access (complete).
-3. **M3:** Static HTML/CSS/vanilla JavaScript frontend served by Node (current scope).
-4. **M4:** Azure Foundry chatbot with controlled read-only SQL execution.
+3. **M3:** Static HTML/CSS/vanilla JavaScript frontend served by Node (complete).
+4. **M4:** Azure Foundry assistant with controlled read-only SQL execution (current scope; live Azure unverified).
 5. **M5:** Broader automated tests, security review, and code quality.
 6. **M6:** GitHub Actions and Azure App Service deployment.
 
 No Azure resources, paid services, deployment workflows, or publishing are part
-of M3. Implementation stops here until M4 is explicitly approved.
+of M4. Implementation stops here until M5 or M6 is explicitly approved.

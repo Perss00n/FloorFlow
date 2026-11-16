@@ -8,6 +8,7 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/styles.css">
   <script type="module" src="/js/customers.js"></script>
+  <script type="module" src="/js/assistant.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -38,13 +39,19 @@
       </section>
       <aside class="panel assistant" aria-labelledby="assistant-heading">
         <div class="assistant-icon" aria-hidden="true">✦</div>
-        <span class="status status-draft">Coming soon</span>
         <h2 id="assistant-heading">AI Assistant</h2>
-        <p>A simpler way to explore your customers, orders and sales.</p>
-        <div class="assistant-note"><strong>A little help, right here.</strong><p>This space will support questions about your business data. The assistant is not available yet.</p></div>
+        <p>Ask about your customers, orders and completed sales.</p>
+        <p class="assistant-disclosure">Each question is independent. Answers use database results; check the SQL when accuracy matters.</p>
+        <div id="chat-messages" class="chat-messages" role="log" aria-label="Assistant conversation" aria-live="polite"></div>
+        <form id="assistant-form" class="assistant-form">
+          <label for="assistant-question">Your question</label>
+          <textarea id="assistant-question" name="message" rows="3" maxlength="1000" required placeholder="How much have we sold in total?"></textarea>
+          <button id="assistant-send" type="submit">Ask FloorFlow</button>
+        </form>
+        <p id="assistant-state" class="assistant-state" role="status" aria-live="polite">Azure Foundry must be configured to answer questions.</p>
       </aside>
     </div>
-    <noscript><p class="notice">JavaScript is required to load customers. Please enable it and reload this page.</p></noscript>
+    <noscript><p class="notice">JavaScript is required to load customers and use the assistant. Please enable it and reload this page.</p></noscript>
   </main>
   <footer class="site-footer"><span>FloorFlow · Built for the work you do.</span><span>All prices in SEK, excluding VAT.</span></footer>
 </body>

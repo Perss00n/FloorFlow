@@ -2,8 +2,9 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { createCustomerRouter } from './routes/customers.js';
 import { createOrderRouter } from './routes/orders.js';
+import { createAssistantRouter } from './routes/assistant.js';
 
-export function createApp(database) {
+export function createApp(database, assistant = null) {
   const app = express();
 
   app.get('/health', async (request, response) => {
@@ -17,6 +18,7 @@ export function createApp(database) {
 
   app.use('/api/customers', createCustomerRouter(database));
   app.use('/api/orders', createOrderRouter(database));
+  app.use('/api/assistant', createAssistantRouter(assistant));
 
   const publicDirectory = fileURLToPath(new URL('../public/', import.meta.url));
   app.use(express.static(publicDirectory, { dotfiles: 'ignore' }));
