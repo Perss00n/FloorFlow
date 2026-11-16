@@ -10,9 +10,10 @@ for (const name of ['PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD']) {
 export const pool = new pg.Pool({
   connectionTimeoutMillis: 3000,
   statement_timeout: 3000,
+  query_timeout: 5000,
 });
 
 // Idle connections can fail outside an awaited query, for example on a DB restart.
-pool.on('error', (error) => {
-  console.error('Unexpected database connection error:', error.message);
+pool.on('error', () => {
+  console.error('An application database connection was closed.');
 });

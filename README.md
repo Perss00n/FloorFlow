@@ -1,11 +1,13 @@
 # FloorFlow
 
-FloorFlow is a small application inspired by flooring contracting. It will show
+FloorFlow is a small application inspired by flooring contracting. It shows
 customers, orders, materials, and labor, with an AI assistant for sales questions.
-This repository implements **M1 through M4**: local PostgreSQL, schema, seed data,
+This repository implements **M1 through M5**: local PostgreSQL, schema, seed data,
 an Express health endpoint, a read-only REST API, and a responsive frontend for
 browsing customers and orders. The home page includes an Azure Foundry database
 assistant with structural SQL validation and a separate read-only login.
+M5 adds optional preview authentication, production configuration guards,
+bounded shutdown, and targeted security and reliability regression tests.
 **Real Azure integration has not been verified:** local tests use model mocks
 and actual PostgreSQL, without paid API calls. Missing configuration returns 503.
 
@@ -41,7 +43,9 @@ FloorFlow/
 │   └── verify.sql
 ├── docs/
 │   ├── API.md
-│   └── ASSISTANT.md
+│   ├── ASSISTANT.md
+│   ├── AZURE_ACCEPTANCE.md
+│   └── READINESS.md
 ├── scripts/
 │   └── setup-assistant-db.js
 ├── public/
@@ -62,6 +66,9 @@ FloorFlow/
 ├── src/
 │   ├── app.js
 │   ├── db.js
+│   ├── preview-auth.js
+│   ├── runtime.js
+│   ├── shutdown.js
 │   ├── assistant/
 │   │   ├── assistant.js
 │   │   ├── config.js
@@ -85,6 +92,10 @@ FloorFlow/
     ├── format.test.js
     ├── frontend-api.test.js
     ├── health.test.js
+    ├── preview-auth.test.js
+    ├── runtime.test.js
+    ├── shutdown.test.js
+    ├── startup.test.js
     └── static.test.js
 ```
 
@@ -106,6 +117,10 @@ The other example values are usable defaults:
 | Variable | Purpose |
 | --- | --- |
 | `PORT` | Node HTTP port, normally `3000` |
+| `NODE_ENV` / `HOST` | Development defaults to loopback; production defaults to all interfaces |
+| `PREVIEW_USERNAME` / `PREVIEW_PASSWORD` | Both blank locally, both required in production |
+| `TRUST_PROXY` | Blank locally; explicitly trusted ingress addresses in production |
+| `PGSSLMODE` | Blank locally; `verify-full` required in production |
 | `PGHOST` | Host used by Node, normally `127.0.0.1` |
 | `PGPORT` | Published PostgreSQL port, normally `5432` |
 | `PGDATABASE` | Local database name |
@@ -116,7 +131,8 @@ The other example values are usable defaults:
 | `AZURE_FOUNDRY_MODEL` | Actual Azure model deployment name |
 | `AZURE_FOUNDRY_API_KEY` | Azure resource API key, server only; blank disables AI |
 
-Compose and Node both read `.env`. Compose maps the `PG*` values to the official
+Compose and Node both support `.env`; Node also starts without that file when
+the host supplies environment variables. Compose maps the `PG*` values to the official
 image's `POSTGRES_*` initialization variables. Existing shell variables override
 file values, so avoid conflicting `PG*` settings in your terminal. If a port is
 occupied, change `PGPORT` or `PORT` in `.env`. Keep `PGHOST=127.0.0.1` for this setup.
@@ -299,8 +315,8 @@ npm run db:assistant:setup
   also reject PostgreSQL's special `NaN` numeric value. Units are `m²`, `pcs`,
   and `hours`; buckets and individual skirting lengths are counted as pieces.
 - Status is constrained to `draft`, `pending`, `completed`, or `cancelled`.
-  **Only completed orders count as sales.** No invoices, inventory, authentication,
-  or dedicated time reporting are implemented.
+  **Only completed orders count as sales.** No invoices, inventory, user accounts,
+  or dedicated time reporting are implemented. Preview access uses a shared gate.
 - `order_items.unit_price` is an independent snapshot. Future order creation must
   copy the agreed price into it. Totals use this price, never the current catalog
   price. Round each line's `quantity * unit_price` to two decimal places, then sum
@@ -325,7 +341,8 @@ docker compose ps
 docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f /verification/verify.sql'
 ```
 
-`npm test` uses Node's built-in test runner and the actual database from `.env`.
+`npm test` uses Node's built-in test runner and the actual database configured
+through environment variables or the optional `.env`.
 The unchanged M1 tests check relationships, fixture counts, completed sales,
 customer spending, oak quantities, invalid data, historical prices, and health.
 M2 adds HTTP integration checks for every API endpoint, ID validation, missing
@@ -420,30 +437,56 @@ resources were provisioned, no paid calls were made, and seed data is unchanged.
   Express 5 forwards rejected async handlers to the final error middleware;
   clients receive a generic JSON 500, without raw database details.
 - This Compose account is the image's initialization superuser for local
-  development. It is not the future chatbot account. Least-privilege runtime
-  credentials and a controlled read-only AI connection belong to M4/M6.
+  development. The assistant uses its separate restricted M4 login. M6 must
+  provision non-admin runtime credentials rather than deploying this superuser.
 
 See the [official PostgreSQL image documentation](https://hub.docker.com/_/postgres)
 for initialization and volume behavior, and the
 [node-postgres connection documentation](https://node-postgres.com/features/connecting)
 for `PG*` variables.
 
-## Deployment notes for M6
+## M5 quality and preview configuration
 
-The server still binds to `127.0.0.1`. Azure will need an appropriate listening
-interface. The `npm start` command still requires a physical `.env` file, while
-Azure App Service will supply environment variables. These settings are kept
-unchanged in M4 and must be addressed and tested in M6. No Azure resources or
-deployment workflows have been created.
+Local startup commands above are unchanged. Leave preview credentials blank for
+local development, or set both `PREVIEW_USERNAME` and `PREVIEW_PASSWORD` in the
+ignored `.env` and restart to enable HTTP Basic authentication. The browser asks
+for the credentials; every page, asset, API route, and `/health` is protected.
+Credentials are never sent in frontend assets. Production requires both values,
+a password of at least 16 characters, verified database TLS, and HTTPS access.
+
+The process reads validated hosting settings in `runtime.js`; `preview-auth.js`
+is a small built-in-crypto middleware before all routes. `shutdown.js` drains
+HTTP and closes pools once, with a ten-second total deadline. The existing
+application/database/server separation remains, with no new dependencies.
+
+Run `npm test`, `npm audit`, and `docker compose config --quiet` locally. M5
+verification on **2026-11-16**: **264 passed**, none failed or skipped, including
+the original 230. The audit reports zero known vulnerabilities. M5 adds
+tests for preview access, proxy spoofing, the parser's decimal-underflow edge,
+redacted errors, environment-only startup and bounded shutdown. Browser smoke
+checks cover all three pages at desktop and mobile sizes and the unavailable AI
+state. Schema and seed data remain unchanged; no real Azure call was made.
+
+See [READINESS.md](docs/READINESS.md) for review severity, configuration requirements,
+HTTPS/proxy and shared-password limitations, database permissions, and actual
+verification scope. See the [real Azure acceptance checklist](docs/AZURE_ACCEPTANCE.md)
+for business interpretation tests that mocks cannot establish.
+
+The source is prepared for M6 environment validation. Before deployment, configure
+HTTPS-only ingress and its explicit proxy networks, non-admin database logins and
+verified PostgreSQL TLS, protected health probes, secrets and provider budgets.
+`NODE_ENV=production` defaults to `0.0.0.0`; `HOST` can override it. Startup accepts
+host environment variables without `.env`. Actual Azure hosting and a real
+deployed model remain unverified. No cloud resources or pipelines exist here.
 
 ## Milestones
 
 1. **M1:** Project setup, PostgreSQL, schema, and seed data (complete).
 2. **M2:** Read-only REST API and data access (complete).
 3. **M3:** Static HTML/CSS/vanilla JavaScript frontend served by Node (complete).
-4. **M4:** Azure Foundry assistant with controlled read-only SQL execution (current scope; live Azure unverified).
-5. **M5:** Broader automated tests, security review, and code quality.
+4. **M4:** Azure Foundry assistant with controlled read-only SQL execution (complete locally; live Azure unverified).
+5. **M5:** Broader automated tests, security review, and code quality (complete locally).
 6. **M6:** GitHub Actions and Azure App Service deployment.
 
 No Azure resources, paid services, deployment workflows, or publishing are part
-of M4. Implementation stops here until M5 or M6 is explicitly approved.
+of M5. Implementation stops here until M6 is explicitly approved.

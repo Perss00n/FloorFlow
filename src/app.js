@@ -3,9 +3,22 @@ import { fileURLToPath } from 'node:url';
 import { createCustomerRouter } from './routes/customers.js';
 import { createOrderRouter } from './routes/orders.js';
 import { createAssistantRouter } from './routes/assistant.js';
+import { previewAuth } from './preview-auth.js';
 
-export function createApp(database, assistant = null) {
+export function createApp(database, assistant = null, { preview, trustedProxies = false } = {}) {
   const app = express();
+  app.disable('x-powered-by');
+  app.set('trust proxy', trustedProxies);
+  app.use((request, response, next) => {
+    response.set({
+      'Content-Security-Policy': "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+    });
+    next();
+  });
+  // Protect everything, including health, static files, errors, and the AI route.
+  app.use(previewAuth(preview));
 
   app.get('/health', async (request, response) => {
     try {
@@ -37,7 +50,7 @@ export function createApp(database, assistant = null) {
       return response.status(400).json({ error: 'Invalid URL encoding.' });
     }
 
-    console.error('API request failed:', error.message);
+    console.error('An API request failed.');
     response.status(500).json({ error: 'Internal server error.' });
   });
 

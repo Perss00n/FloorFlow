@@ -17,14 +17,14 @@ function reject() {
 }
 
 function keys(object, allowed) {
-  if (!object || typeof object !== 'object' || Object.keys(object).some((key) => !allowed.includes(key))) reject();
+  if (!object || typeof object !== 'object' || Object.keys(object).some((key) => key !== '_location' && !allowed.includes(key))) reject();
 }
 
 export function validateSql(sql) {
   if (typeof sql !== 'string' || sql.length === 0 || sql.length > 6000 || (sql.match(/\(/g) ?? []).length > 40) reject();
   let statements;
   try {
-    statements = parse(sql);
+    statements = parse(sql, { locationTracking: true });
   } catch {
     reject();
   }
@@ -77,6 +77,9 @@ export function validateSql(sql) {
         // The parser represents literals as JS numbers. Only bounded integers and
         // numeric zero are accepted; actual money values stay in PostgreSQL.
         if (!Number.isSafeInteger(node.value) || Math.abs(node.value) > 1000000 || (node.type === 'numeric' && node.value !== 0)) reject();
+        // A tiny nonzero decimal can underflow to JS zero in the parser. Verify
+        // the original zero literal before regenerating it, so its meaning stays exact.
+        if (node.type === 'numeric' && !/^[+-]?(?:0+(?:\.0*)?|\.0+)$/.test(sql.slice(node._location.start, node._location.end))) reject();
         return false;
       case 'string':
         keys(node, ['type', 'value']);

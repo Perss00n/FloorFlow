@@ -143,6 +143,12 @@ test('the normal application account is refused by the AI execution boundary', a
   await assert.rejects(executeReadQuery(applicationPool, 'SELECT name FROM customers'), (error) => error.status === 503 && error.message.includes('permissions'));
 });
 
+test('a tiny nonzero PostgreSQL decimal is rejected before the parser can change its meaning', async () => {
+  const sql = `SELECT COUNT(*) AS n FROM customers WHERE 0.${'0'.repeat(330)}1 > 0`;
+  assert.deepEqual((await applicationPool.query(sql)).rows, [{ n: '5' }]);
+  await assert.rejects(executeReadQuery(readPool, sql), (error) => error.status === 422);
+});
+
 test('the actual read-only role has no administrative or table-write privileges', async () => {
   const role = (await readPool.query(`SELECT current_user AS name, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls FROM pg_roles WHERE rolname=current_user`)).rows[0];
   assert.equal(role.name, 'floorflow_ai');

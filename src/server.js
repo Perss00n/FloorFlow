@@ -1,41 +1,34 @@
+import { once } from 'node:events';
 import { createApp } from './app.js';
 import { pool } from './db.js';
 import { configureAssistant } from './assistant/config.js';
+import { readRuntimeConfig } from './runtime.js';
+import { createShutdown } from './shutdown.js';
 
-const port = Number(process.env.PORT ?? 3000);
-
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error('PORT must be an integer between 1 and 65535.');
-}
-
+let configured;
+let server;
 try {
+  const runtime = readRuntimeConfig();
   await pool.query('SELECT 1');
-} catch (error) {
-  console.error('Cannot start FloorFlow: database connection failed.', error.message);
-  await pool.end();
-  process.exit(1);
-}
+  configured = configureAssistant();
+  const app = createApp(pool, configured.assistant, runtime);
+  server = app.listen(runtime.port, runtime.host);
+  await once(server, 'listening');
+  console.log(`FloorFlow is listening on ${runtime.host}:${runtime.port}`);
 
-const configured = configureAssistant();
-const app = createApp(pool, configured.assistant);
-const server = app.listen(port, '127.0.0.1', () => {
-  console.log(`FloorFlow is running at http://127.0.0.1:${port}`);
-});
-
-server.on('error', async (error) => {
-  console.error('Cannot start the HTTP server:', error.message);
-  await pool.end();
-  await configured.close();
-  process.exitCode = 1;
-});
-
-// Stop accepting requests before closing the shared database pool.
-function shutdown() {
-  server.close(async () => {
-    await pool.end();
-    await configured.close();
+  const shutdown = createShutdown(server, async () => {
+    await Promise.all([pool.end(), configured.close()]);
   });
+  const stop = () => shutdown().catch(() => {
+    console.error('FloorFlow could not close its resources cleanly.');
+    process.exit(1);
+  });
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
+} catch {
+  // Never print provider/database errors or configuration values (which may be secrets).
+  console.error('Cannot start FloorFlow. Check environment settings, database access, and the listening port.');
+  server?.close();
+  await Promise.allSettled([pool.end(), configured?.close()]);
+  process.exitCode = 1;
 }
-
-process.once('SIGINT', shutdown);
-process.once('SIGTERM', shutdown);

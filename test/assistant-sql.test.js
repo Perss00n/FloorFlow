@@ -95,3 +95,30 @@ test('ordinary aggregation, DISTINCT counts, HAVING and NULL checks are supporte
   `);
   assert.match(query.text, /LEFT JOIN public.orders/);
 });
+
+test('nonzero numeric literals that underflow inside the parser fail closed', () => {
+  const tiny = `0.${'0'.repeat(330)}1`;
+  for (const literal of [tiny, `-${tiny}`, `+${tiny}`]) {
+    assert.throws(() => validateSql(`SELECT COUNT(*) AS n FROM customers WHERE ${literal} > 0`), (error) => error.status === 422);
+  }
+  for (const literal of ['0.00', '.00', '0.', '-0.00']) {
+    assert.match(validateSql(`SELECT COUNT(*) AS n FROM customers WHERE ${literal} = 0`).text, /LIMIT/);
+  }
+});
+
+for (const sql of [
+  'SELECT name FROM customers TABLESAMPLE SYSTEM(1)',
+  'SELECT name FROM ONLY customers',
+  'SELECT name FROM customers UNION ALL SELECT name FROM articles',
+  'SELECT public.round(unit_price,2) AS price FROM articles',
+  'SELECT id FROM customers WHERE id OPERATOR(pg_catalog.=) 1',
+  'SELECT id FROM customers FETCH FIRST 1 ROWS WITH TIES',
+  'SELECT name FROM customers FOR SHARE SKIP LOCKED',
+  'SELECT name FROM customers WHERE false OR pg_sleep(1) IS NULL',
+  'SELECT name FROM customers WHERE true AND set_config(\'role\',\'floorflow\',false) IS NULL',
+  'SELECT name FROM customers LIMIT ALL',
+]) {
+  test(`additional SQL boundary rejects ${sql}`, () => {
+    assert.throws(() => validateSql(sql), (error) => error.status === 422);
+  });
+}

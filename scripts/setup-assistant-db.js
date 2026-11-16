@@ -7,8 +7,10 @@ if (process.env.AI_PGUSER !== 'floorflow_ai' || !password || password === proces
   process.exit(1);
 }
 
-const client = await pool.connect();
+let client;
+let discard = false;
 try {
+  client = await pool.connect();
   await client.query('BEGIN');
   const existing = await client.query("SELECT oid, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls FROM pg_roles WHERE rolname = 'floorflow_ai'");
   if (existing.rowCount === 0) {
@@ -52,11 +54,13 @@ try {
   await client.query('COMMIT');
   console.log('Configured floorflow_ai with SELECT on the four FloorFlow tables. No seed rows were changed.');
 } catch (error) {
-  await client.query('ROLLBACK');
+  if (client) {
+    try { await client.query('ROLLBACK'); } catch { discard = true; }
+  }
   console.error('Assistant database setup failed. Check the admin connection, separate password, and existing role permissions.');
   if (/^[0-9A-Z]{5}$/.test(error.code ?? '')) console.error(`PostgreSQL error code: ${error.code}`);
   process.exitCode = 1;
 } finally {
-  client.release();
+  client?.release(discard);
   await pool.end();
 }

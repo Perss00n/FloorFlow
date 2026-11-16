@@ -1,4 +1,4 @@
-# AI assistant (M4)
+# AI assistant (M4, reviewed in M5)
 
 ## Current verification status
 
@@ -136,7 +136,9 @@ Use simple SQL rather than expanding the validator to accommodate every model re
 
 The parser represents numeric literals as JavaScript numbers. To avoid literal
 precision loss, the policy accepts only bounded integer literals (absolute value
-at most 1000000) and numeric zero. Other decimal constants are rejected. Actual
+at most 1000000) and numeric zero. M5 uses parser source locations to ensure a
+nonzero decimal cannot underflow to zero and change meaning during regeneration.
+Other decimal constants are rejected. Actual
 stored monetary values and calculations are always PostgreSQL NUMERIC.
 
 The row cap bounds output, while database timeouts and resource settings also
@@ -146,8 +148,9 @@ are read; exceptionally large future TEXT fields can still consume memory.
 
 Rate limits are held in process memory and reset on restart. They are suitable
 for this local MVP, not durable spending limits across several cloud instances.
-There is no authentication in this milestone. Shared limits, authorization, and
-provider budgets must be reconsidered before public exposure; none are deployed here.
+M5 adds a server-side preview gate covering the assistant and all other routes.
+See [READINESS.md](READINESS.md) for production HTTPS, proxy trust, shared-password
+limitations and provider budgets. No public service is deployed here.
 
 ## Azure Foundry configuration (later, with approval)
 
@@ -181,6 +184,9 @@ sales. Inspect the SQL and returned rows. Unsupported SQL should be rejected;
 do not remove safeguards or automatically retry to make a model response pass.
 Actual prices, deployment capabilities, permissions, latency, and output quality
 still require verification with the chosen Azure deployment.
+Use the [real Azure acceptance checklist](AZURE_ACCEPTANCE.md): completed-only
+filters, historical pricing, line-level rounding, article selection and rankings
+must be checked against actual model output, not replaced with a SQL mock.
 
 ## Testing without Azure
 

@@ -7,7 +7,19 @@ single resources are plain objects. Timestamps are ISO 8601 UTC strings.
 
 All prices and totals are **SEK excluding VAT**. Monetary values are JSON
 strings with two decimal places, and quantities are strings with three decimal
-places. IDs are JSON integers. There is no authentication or customer/order write API.
+places. IDs are JSON integers. There is no customer/order write API.
+
+## Preview authentication (M5)
+
+Local authentication is optional. When enabled, all paths (including HTML/assets,
+health and assistant) require the server-configured HTTP Basic credentials.
+Supply them using the browser prompt or your API client's Basic auth option;
+never put them in a URL. Missing or invalid credentials return HTTP 401:
+`{"error":"Preview authentication is required."}` with `WWW-Authenticate`.
+Authenticated response contracts below are unchanged. Protected responses use
+`Cache-Control: no-store`. Production requires HTTPS: insecure requests receive
+426 `{"error":"HTTPS is required for preview access."}` before any challenge.
+See [configuration and proxy requirements](READINESS.md#preview-access).
 
 ## GET /api/customers
 
@@ -307,7 +319,9 @@ errors are service errors, not a request to authenticate the browser user. Raw
 provider/database messages, credentials, and stack traces are not returned or
 logged by the assistant. Model retries are disabled. Limits are 5 accepted
 requests/IP/minute, 30/process/hour, and one active request at a time. The local
-app does not trust forwarded IP headers. Counters reset on process restart.
+app does not trust forwarded IP headers by default. Production may explicitly
+trust its ingress addresses; that proxy must overwrite client-supplied headers.
+Counters reset on process restart.
 
 See [ASSISTANT.md](ASSISTANT.md) for SQL restrictions, role setup, execution
 limits, privacy boundaries, mocked versus real verification, and the explicit
