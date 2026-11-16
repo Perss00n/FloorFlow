@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer | FloorFlow</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/styles.css">
+  <script type="module" src="/js/customer.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">F</span>FloorFlow</a>
+      <nav aria-label="Main navigation"><a class="nav-link active" href="/">Customers</a></nav>
+      <span class="workspace-label">Customer &amp; order workspace</span>
+    </div>
+  </header>
+  <main id="main-content" class="page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Customers</a></li><li aria-current="page">Customer details</li></ol></nav>
+    <header class="page-heading">
+      <p class="eyebrow">Customer details</p>
+      <h1 id="customer-name">Customer</h1>
+      <p class="page-description">Contact details and a clear view of every order.</p>
+    </header>
+    <div id="page-state" class="panel state" role="status" aria-live="polite">
+      <h2 id="state-title">Loading customer…</h2>
+      <p id="state-message">Getting contact details and orders.</p>
+      <a id="retry-link" class="button" href="" hidden>Reload page</a>
+    </div>
+    <div id="customer-content" hidden>
+      <section class="panel contact-panel" aria-label="Customer contact information">
+        <dl class="contact-details"><div><dt>Email address</dt><dd id="customer-email"></dd></div><div><dt>Phone number</dt><dd id="customer-phone"></dd></div></dl>
+      </section>
+      <section class="panel" aria-labelledby="orders-heading">
+        <div class="panel-heading"><div><h2 id="orders-heading">Orders <span id="order-count" class="count"></span></h2><p>All statuses · Newest first · SEK excluding VAT</p></div></div>
+        <div id="orders-empty" class="state" hidden><h3>No orders yet</h3><p>This customer does not have any orders.</p></div>
+        <div id="orders-table" class="table-wrap">
+          <table class="responsive-table">
+            <caption class="sr-only">Orders for this customer. All amounts are SEK excluding VAT.</caption>
+            <thead><tr><th scope="col">Order number</th><th scope="col">Status</th><th scope="col">Created</th><th scope="col" class="amount">Order total</th></tr></thead>
+            <tbody id="orders-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <a class="back-link" href="/">← Back to customers</a>
+    <noscript><p class="notice">JavaScript is required to load this customer. Please enable it and reload this page.</p></noscript>
+  </main>
+  <footer class="site-footer"><span>FloorFlow · Built for the work you do.</span><span>All prices in SEK, excluding VAT.</span></footer>
+</body>
+</html>

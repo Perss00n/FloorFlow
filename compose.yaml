@@ -1,0 +1,24 @@
+name: floorflow
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${PGDATABASE:?Set PGDATABASE in .env}
+      POSTGRES_USER: ${PGUSER:?Set PGUSER in .env}
+      POSTGRES_PASSWORD: ${PGPASSWORD:?Set PGPASSWORD in .env}
+    ports:
+      - "127.0.0.1:${PGPORT:?Set PGPORT in .env}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ./db/verify.sql:/verification/verify.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+
+volumes:
+  postgres_data:

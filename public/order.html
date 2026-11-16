@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order | FloorFlow</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/styles.css">
+  <script type="module" src="/js/order.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">F</span>FloorFlow</a>
+      <nav aria-label="Main navigation"><a class="nav-link active" href="/">Customers</a></nav>
+      <span class="workspace-label">Customer &amp; order workspace</span>
+    </div>
+  </header>
+  <main id="main-content" class="page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Customers</a></li><li id="customer-breadcrumb-item" hidden><a id="customer-breadcrumb" href="/">Customer</a></li><li aria-current="page">Order details</li></ol></nav>
+    <header class="page-heading">
+      <p class="eyebrow">Order details</p>
+      <h1 id="order-number">Order</h1>
+      <p class="page-description">Materials, labor and the agreed prices for this order.</p>
+    </header>
+    <div id="page-state" class="panel state" role="status" aria-live="polite">
+      <h2 id="state-title">Loading order…</h2>
+      <p id="state-message">Getting order details and articles.</p>
+      <a id="retry-link" class="button" href="" hidden>Reload page</a>
+    </div>
+    <div id="order-content" hidden>
+      <section class="order-summary" aria-label="Order summary">
+        <div class="panel order-information">
+          <dl class="order-facts"><div><dt>Customer</dt><dd><a id="order-customer" href="/"></a></dd></div><div><dt>Created</dt><dd id="order-date"></dd></div><div><dt>Status</dt><dd id="order-status"></dd></div></dl>
+          <dl class="contact-details"><div><dt>Email address</dt><dd id="customer-email"></dd></div><div><dt>Phone number</dt><dd id="customer-phone"></dd></div></dl>
+        </div>
+        <div class="total-panel"><p>Order total</p><strong id="order-total"></strong><span>SEK excluding VAT · All order items</span></div>
+      </section>
+      <section class="panel" aria-labelledby="items-heading">
+        <div class="panel-heading"><div><h2 id="items-heading">Order items <span id="item-count" class="count"></span></h2><p>Materials and labor at their agreed unit prices.</p></div></div>
+        <div id="items-empty" class="state" hidden><h3>No items on this order</h3><p>There are no articles to display. The order total is zero.</p></div>
+        <div id="items-table" class="table-wrap">
+          <table class="responsive-table items-table">
+            <caption class="sr-only">Articles and historical prices. All amounts are SEK excluding VAT.</caption>
+            <thead><tr><th scope="col">Article</th><th scope="col">Quantity</th><th scope="col" class="amount">Unit price</th><th scope="col" class="amount">Line total</th></tr></thead>
+            <tbody id="items-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <a id="back-link" class="back-link" href="/">← Back to customers</a>
+    <noscript><p class="notice">JavaScript is required to load this order. Please enable it and reload this page.</p></noscript>
+  </main>
+  <footer class="site-footer"><span>FloorFlow · Built for the work you do.</span><span>All prices in SEK, excluding VAT.</span></footer>
+</body>
+</html>

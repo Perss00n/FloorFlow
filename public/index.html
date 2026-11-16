@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Browse your flooring customers and their order history with FloorFlow.">
+  <title>Customers | FloorFlow</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/styles.css">
+  <script type="module" src="/js/customers.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">F</span>FloorFlow</a>
+      <nav aria-label="Main navigation"><a class="nav-link active" href="/" aria-current="page">Customers</a></nav>
+      <span class="workspace-label">Customer &amp; order workspace</span>
+    </div>
+  </header>
+  <main id="main-content" class="page">
+    <header class="page-heading">
+      <p class="eyebrow">Your workspace</p>
+      <h1>Customers</h1>
+      <p class="page-description">Good work starts with knowing your customers. Find their details and order history here.</p>
+    </header>
+    <div class="overview-layout">
+      <section class="panel" aria-labelledby="directory-heading">
+        <div class="panel-heading">
+          <div><h2 id="directory-heading">Customer directory <span id="customer-count" class="count" hidden></span></h2><p>Select a customer to view their orders.</p></div>
+        </div>
+        <div id="page-state" class="state" role="status" aria-live="polite">
+          <h3 id="state-title">Loading customers…</h3>
+          <p id="state-message">Getting the latest customer details.</p>
+          <a id="retry-link" class="button" href="" hidden>Reload page</a>
+        </div>
+        <ul id="customer-list" class="customer-list" hidden></ul>
+      </section>
+      <aside class="panel assistant" aria-labelledby="assistant-heading">
+        <div class="assistant-icon" aria-hidden="true">✦</div>
+        <span class="status status-draft">Coming soon</span>
+        <h2 id="assistant-heading">AI Assistant</h2>
+        <p>A simpler way to explore your customers, orders and sales.</p>
+        <div class="assistant-note"><strong>A little help, right here.</strong><p>This space will support questions about your business data. The assistant is not available yet.</p></div>
+      </aside>
+    </div>
+    <noscript><p class="notice">JavaScript is required to load customers. Please enable it and reload this page.</p></noscript>
+  </main>
+  <footer class="site-footer"><span>FloorFlow · Built for the work you do.</span><span>All prices in SEK, excluding VAT.</span></footer>
+</body>
+</html>
