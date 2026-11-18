@@ -1,9 +1,10 @@
-# Azure deployment plan (M6B Stage 3; not provisioned)
+# Azure deployment plan (M6B Stage 3.5; not provisioned)
 
-Review date: **2026-11-18**. Only the three authorized resource providers were
-registered. No resource group, billable resource, deployment identity, deployment
-workflow or model call was created. Provisioning and paid tests require approval.
-The repository remains private. No application code was changed in Stage 3.
+Review date: **2026-11-18**. Stage 3 registered only the three authorized resource
+providers. Stage 3.5 used authenticated read-only GET requests after an approved
+local Azure CLI installation. No resource group, billable resource, deployment
+identity, deployment workflow or model call was created. Provisioning and paid
+tests require approval. The repository remains private; application code is unchanged.
 
 ## Verified subscription facts
 
@@ -34,7 +35,7 @@ resource creation. An offered SKU and available quota do not reserve capacity.
 | --- | --- | --- |
 | App Service | One Linux **Free F1** app, Node.js **24 LTS**, default `azurewebsites.net` HTTPS hostname | All four choices, including Sweden Central, were selectable together in the subscription's form. Actual allocation is unverified; F1 has shared CPU, 60 CPU minutes/day, 1 GB memory/storage, no SLA or Always On. Expect cold starts. |
 | Database | Azure Database for PostgreSQL Flexible Server **18**, Burstable **Standard_B1ms**, 1 vCore/2 GiB RAM, **32 GiB Premium SSD**, P4/120 IOPS, no HA, 7-day local backups | This exact combination was selectable. Premium SSD **v2** disables Burstable in the portal; explicitly use Premium SSD. Leave geo-backup and storage autogrowth off for the bounded demo. |
-| Model | Conditional preference: **gpt-5-mini (2025-08-07), Global Standard**, pay per token | Publicly listed for Sweden Central; usable subscription quota, offer eligibility and allocation are not established. No provisioned throughput. See model review below. |
+| Model | **gpt-5-mini (2025-08-07), GlobalStandard**, pay per token, initially **10,000 TPM** | Positive assigned quota and subscription-scoped capacity were confirmed for Sweden Central. Actual resource/deployment creation permission and live-model behavior remain untested. No provisioned throughput. |
 | Region | Prefer **Sweden Central** for all resource locations | No alternative region, paid tier or database version was selected. Global Standard inference can process outside Sweden; data-zone options change residency and pricing. |
 | Networking | Public PostgreSQL endpoint, verified TLS, explicit App Service outbound-IP firewall rules | F1 has no VNet integration. Avoid internet-wide or “allow all Azure services” rules. Add a developer IP only temporarily for bootstrap. |
 
@@ -63,19 +64,74 @@ provisioning. No alternative SKU is authorized by this plan.
 
 ## Foundry model and client review
 
-The authenticated Foundry catalog exposed **gpt-5-mini**. Both the new resource
-list and project selector were empty; the model flow required an existing
-project and offered only creation of a new one. No project was created. Actual
-TPM/RPM quota, quota tier, offer restrictions and model deployment entitlement
-could not be established through that portal flow. **Unknown is not zero quota.**
-Azure CLI is not installed locally; no authenticated control-plane quota query
-was executed. Such a read-only query is an alternative to creating a resource.
-Provider registration alone neither grants model quota nor verifies trial access.
+The Stage 3 portal flow required an existing project. Stage 3.5 resolved the
+quota/capacity question **without creating one**: Microsoft Azure CLI **2.93.0**
+was installed with explicit approval, authenticated to the existing tenant, and
+matched against the portal-verified subscription privately. Tokens and request
+headers were not printed. The Learn console's profile-creation flow was cancelled.
+
+### Actual subscription GET results
+
+Snapshot: **2026-11-18, 14:08 UTC**. All four requests returned **HTTP 200**,
+one complete page each, with no continuation link or API error:
+
+| GET operation | API version | Returned entries |
+| --- | --- | --- |
+| `locations/swedencentral/usages` | 2024-10-01 | 308 |
+| `modelCapacities`, OpenAI / gpt-5-mini / 2025-08-07 | 2024-10-01 | 92 |
+| `modelCapacities`, OpenAI / gpt-5-nano / 2025-08-07 | 2024-10-01 | 40 |
+| `quotaTiers` | 2025-10-01-preview | 1 |
+
+These paths follow `/subscriptions/{subscriptionId}/providers/Microsoft.CognitiveServices/`.
+Capacity requests supplied `modelFormat`, `modelName` and `modelVersion` exactly
+as listed. No PUT, PATCH, deployment or inference operation was performed.
+
+| Sweden Central quota name (`OpenAI.` prefix omitted) | currentValue | limit | unit | Assigned TPM limit |
+| --- | --- | --- | --- | --- |
+| GlobalStandard.gpt-5-mini | 0 | **500** | Count | **500,000** |
+| GlobalStandard.gpt-5-nano | 0 | **0** | Count | **0** |
+| DataZoneStandard.gpt-5-mini | 0 | **0** | Count | **0** |
+| DataZoneStandard.gpt-5-nano | 0 | **0** | Count | **0** |
+
+Each meter's description explicitly says **One Thousand Tokens Per Minute**.
+`currentValue` measures quota consumed by deployments, not inference-token spend.
+The zero limits above are explicit returned values, not inferred from missing rows.
+
+For **Sweden Central**, Model Capacities returned `availableCapacity: 500` for
+mini / GlobalStandard and **0** for nano / GlobalStandard. Mini's other returned
+SKUs there were DataZoneStandard, ProvisionedManaged, DataZoneProvisionedManaged
+and GlobalProvisionedManaged, all **0**. Nano returned DataZoneStandard **0**;
+its unreturned provisioned SKUs must not be called zero. Across all returned
+locations, mini had GlobalStandard capacity **500** at **26** locations including
+Sweden Central; nano had **0** at all **26** GlobalStandard locations. Other
+returned deployment types had no positive capacity. No alternate region was chosen.
+
+`availableCapacity` is the API's raw **capacity-unit** value; the capacity response
+does not contain a separate unit field. It is subscription-scoped availability,
+not a measurement of Azure's entire GPU pool or a capacity reservation. Do not
+sum repeated regional values into a larger global quota.
+
+The quota-tier API returned **Free Tier**, assigned at `2026-11-18T13:26:48Z`,
+with policy **OnceUpgradeIsAvailable** (unchanged). The subscription GET also
+showed policy `quotaId: FreeTrial_2014-09-01` and `spendingLimit: On`; these are
+billing/offer properties, not the Foundry quota-tier field. Microsoft's current
+Tier 0 reference lists mini / GlobalStandard at **500,000 TPM / 500 RPM** and
+disallows quota-increase requests at that tier. The RPM figure is documentation,
+not a separately returned usage meter. Free Tier does **not** mean free inference.
+
+**Recommendation:** one mini / GlobalStandard deployment in Sweden Central,
+initially **10,000 TPM** rather than allocating the full 500,000. This leaves
+headroom for a schema-bearing question and the proposed completion budget;
+1,000 TPM may not accommodate even one request. Confirm accepted allocation
+granularity during the approved deployment. No quota-driven billing upgrade is
+justified by these results alone. Owner access, registration, quota and reported
+capacity support evaluation, but actual resource/deployment permission, provider
+policy validation and live inference still require the separately approved stage.
 
 | Candidate | Public capabilities and availability | Decision |
 | --- | --- | --- |
-| gpt-5-mini, 2025-08-07 | GA; Sweden Central Global Standard; Chat Completions and strict structured output | Preferred evaluation candidate, conditional on actual quota/eligibility. |
-| gpt-5-nano, 2025-08-07 | GA; Sweden Central Global Standard; same required API features; lower token prices | Cheaper candidate for a later comparison; SQL/business accuracy is untested. No automatic fallback. |
+| gpt-5-mini, 2025-08-07 | GA; Sweden Central Global Standard; Chat Completions and strict structured output | Preferred evaluation model; positive quota/capacity verified, actual deployment untested. |
+| gpt-5-nano, 2025-08-07 | GA; same required API features; lower public token prices | **Unavailable under the current returned zero quota/capacity.** No automatic fallback, upgrade or quota request. |
 | gpt-4.1-mini, 2025-04-14 | Deprecated; Microsoft restricts new-customer access | **Superseded M6A recommendation; do not prefer it for this subscription.** |
 
 Review of `src/assistant/model.js`: the v1 endpoint, single system message,
@@ -99,7 +155,10 @@ Sources: [model capabilities](https://learn.microsoft.com/en-us/azure/foundry/fo
 [lifecycle schedule](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule),
 [new-customer restrictions](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements),
 [reasoning/token budgets](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning),
-[quota and offer eligibility](https://learn.microsoft.com/en-us/azure/foundry/openai/quotas-limits).
+[quota/tier reference](https://learn.microsoft.com/en-us/azure/foundry/openai/quotas-limits),
+[GET interpretation](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/quota),
+[Usages REST API](https://learn.microsoft.com/en-us/rest/api/aiservices/accountmanagement/usages/list?view=rest-aiservices-accountmanagement-2024-10-01),
+[Model Capacities REST API](https://learn.microsoft.com/en-us/rest/api/aiservices/accountmanagement/model-capacities/list?view=rest-aiservices-accountmanagement-2024-10-01).
 
 ## Cost estimate and credit expiry
 
@@ -130,7 +189,8 @@ or **73 SEK** with App Service B1. Four weeks is approximately **173 / 293 SEK**
 
 The current [Azure OpenAI pricing page](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
 publishes Global Standard USD rates per million tokens: mini **0.25 input / 2.00
-output**, nano **0.05 / 0.40**. Using an explicitly approximate **10 SEK/USD**
+output**, nano **0.05 / 0.40** (price comparison only; nano currently has no usable
+quota). Using an explicitly approximate **10 SEK/USD**
 planning conversion gives mini **2.50 / 20 SEK**, nano **0.50 / 4 SEK**. These
 are estimates, not subscription SEK quotes; ignore caching discounts when budgeting.
 For 100 mini questions assuming 3,000 input tokens each, cost is about **3.15 SEK**
@@ -290,12 +350,13 @@ documents the identity and app-scoped role. No deployment job exists.
 
 1. **Completed in Stage 2:** PR #1 merged normally as `90108d8`;
    [main CI](https://github.com/Perss00n/FloorFlow/actions/runs/44294173763) passed
-   all 264 tests. Stage 3 changed documentation only; no new CI run was triggered.
-2. **Still blocking provisioning approval:** establish actual model quota/access
-   and whether an account upgrade is required; obtain any separate billing-change
-   approval first. Recheck regional allocation, B1ms availability and matching
-   allowance eligibility. Approve exact resources, costs and cleanup date without
-   silently changing region, tier, database version or model.
+   all 264 tests. Stages 3 and 3.5 changed documentation only; no new CI run was triggered.
+2. **Stage 3.5 quota/capacity check complete:** mini / GlobalStandard has positive
+   quota and reported capacity in Sweden Central; nano does not. Obtain explicit
+   provisioning approval for the exact resources, costs and cleanup date. Recheck
+   the snapshot's capacity, B1ms availability and allowance eligibility; actual
+   resource/deployment policy validation is still untested. Stop on any denial
+   rather than changing region, tier, version, model or billing automatically.
 3. Provision the approved resources, restricted firewall, HTTPS and secrets;
    implement and verify managed PostgreSQL bootstrap and inherited resource limits.
 4. Verify the actual ingress/proxy trust, Basic authentication, certificate
