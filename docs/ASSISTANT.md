@@ -71,6 +71,8 @@ the security boundary remains validation plus database permissions and limits.
 
 Use the existing local Docker database. Do not run this setup against a shared
 or production database without reviewing its permission changes.
+For Azure Flexible Server, follow the [managed-provider plan](DEPLOYMENT.md#managed-postgresql-bootstrap-required-m6b-work);
+the local superuser setup is not assumed to work unchanged on a managed service.
 
 1. In the ignored `.env`, set `AI_PGUSER=floorflow_ai` and a new
    `AI_PGPASSWORD` different from `PGPASSWORD`. Never commit real credentials.

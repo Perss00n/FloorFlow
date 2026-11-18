@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      COMPOSE_PROJECT_NAME: floorflow-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      NODE_ENV: test
+      PGHOST: 127.0.0.1
+      PGPORT: '55435'
+      PGDATABASE: floorflow_ci
+      PGUSER: floorflow_ci
+      PGSSLMODE: disable
+      AI_PGUSER: floorflow_ai
+      HOST: 127.0.0.1
+      PREVIEW_USERNAME: ''
+      PREVIEW_PASSWORD: ''
+      TRUST_PROXY: ''
+      AZURE_FOUNDRY_ENDPOINT: ''
+      AZURE_FOUNDRY_MODEL: ''
+      AZURE_FOUNDRY_API_KEY: ''
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Generate temporary database passwords
+        run: |
+          node --input-type=module <<'NODE'
+          import { randomBytes } from 'node:crypto';
+          import { appendFileSync } from 'node:fs';
+          for (const name of ['PGPASSWORD', 'AI_PGPASSWORD']) {
+            const value = randomBytes(24).toString('hex');
+            console.log(`::add-mask::${value}`);
+            appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`);
+          }
+          NODE
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate Compose and initialize PostgreSQL 18
+        run: |
+          docker compose --env-file /dev/null config --quiet
+          docker compose --env-file /dev/null up -d --wait --wait-timeout 90 db
+
+      - name: Set up the restricted AI database role
+        run: npm run db:assistant:setup
+
+      - name: Check JavaScript syntax
+        run: npm run check:syntax
+
+      - name: Run all automated tests
+        run: npm test
+
+      - name: Audit dependencies
+        run: npm audit
+
+      - name: Remove CI database and volume
+        if: always()
+        run: docker compose --env-file /dev/null down --volumes --remove-orphans

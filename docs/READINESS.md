@@ -3,6 +3,8 @@
 M5 prepares the source for a restricted reviewer demo. Nothing is deployed.
 Azure calls, actual cloud ingress, PostgreSQL TLS, and Linux signal delivery have
 not been verified. Complete the environment checks below in M6 before sharing it.
+M6A's [deployment plan](DEPLOYMENT.md) now specifies managed-role adjustments,
+the protected health strategy, costs and the remaining M6B verification gates.
 
 ## Review findings
 
