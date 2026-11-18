@@ -1,8 +1,10 @@
 # GitHub Actions CI (M6A)
 
 The existing repository is private: `Perss00n/FloorFlow`, default branch `main`.
-M6A adds [.github/workflows/ci.yml](../.github/workflows/ci.yml) locally. It has
-not been pushed, so **no GitHub-hosted run of this workflow has been verified**.
+M6A adds [.github/workflows/ci.yml](../.github/workflows/ci.yml).
+[PR #1](https://github.com/Perss00n/FloorFlow/pull/1) triggered a successful
+[GitHub-hosted run](https://github.com/Perss00n/FloorFlow/actions/runs/44292447465)
+on **2026-11-18**. The main-push trigger is checked separately after merging.
 
 ## Workflow
 
@@ -97,8 +99,12 @@ require the local initialization administrator and make rollback-only changes.
   three-second readiness window. The native Linux replay passed without changing
   application code, tests or timeouts. Avoid Windows-mounted dependency trees for
   this comparison. The first host attempt also required starting the local DB.
-- Official action execution, workflow triggers, runner image behavior and GitHub
-  token policy still require the first approved push and actual hosted run.
+- Hosted PR run #1 passed on Ubuntu 24.04.5, Node 24.22.2 and npm 11.19.1:
+  `npm ci`, fresh PostgreSQL 18 initialization, restricted-role setup, all 39
+  syntax checks, **264 tests** (zero failed/skipped), audit (zero vulnerabilities),
+  and database/network/volume cleanup succeeded. Azure settings were blank;
+  SDK tests used mocks/intercepted transport. GitGuardian also passed.
+  GitHub checked its generated PR merge reference; this did not merge the PR.
 
 ## Secret review
 

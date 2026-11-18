@@ -184,10 +184,10 @@ documents the identity and app-scoped role. No deployment job exists in M6A.
 
 ## Exact remaining M6B gates
 
-1. Approve pushing `codex/m6a-ci-preparation` to the existing private repository
-   and opening a pull request targeting `main`. A branch push alone does not
-   trigger this workflow. Observe the PR CI run, review/approve the merge, and
-   verify the resulting `main` CI run before deployment.
+1. The initial [PR #1 CI run](https://github.com/Perss00n/FloorFlow/actions/runs/44292447465)
+   passed all 264 tests. Verify the updated PR checks, merge the approved PR
+   without rewriting history, and require a successful resulting `main` CI run
+   before deployment. A development-branch push alone does not trigger CI.
 2. Approve the resource/SKU/region choices, current subscription pricing, credit
    eligibility and spend/removal dates. Confirm Node 24, PostgreSQL 18/B1ms and
    model capacity using the subscription, without silently downgrading the DB.

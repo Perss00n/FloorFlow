@@ -512,8 +512,10 @@ See [CI.md](docs/CI.md) for CI environment variables, isolated-run cleanup and
 secret-review findings. On **2026-11-18**, workflow validation passed with
 `actionlint`, all **39 JS files** passed syntax checks, and all **264 tests** passed
 on Windows and in a fresh native-Linux replay without `.env`. The audit found
-zero known vulnerabilities. **GitHub-hosted execution remains unverified until
-an approved push.** Application code, tests, schema and seed data are unchanged.
+zero known vulnerabilities. The [GitHub-hosted PR run](https://github.com/Perss00n/FloorFlow/actions/runs/44292447465)
+also passed all 264 tests, syntax checks, role setup, audit and cleanup on Ubuntu
+24.04.5 with Node 24.22.2. Azure settings were blank and no paid model calls were
+made. Application code, tests, schema and seed data are unchanged.
 
 The recommended short-lived demo is Linux App Service **F1**, PostgreSQL Flexible
 Server **18 / B1ms / 32 GiB**, and a small Azure Foundry pay-per-token model,
@@ -534,7 +536,7 @@ compatibility/model testing; nothing is deployed or provisioned in M6A.
 3. **M3:** Static HTML/CSS/vanilla JavaScript frontend served by Node (complete).
 4. **M4:** Azure Foundry assistant with controlled read-only SQL execution (complete locally; live Azure unverified).
 5. **M5:** Broader automated tests, security review, and code quality (complete locally).
-6. **M6A:** GitHub repository review, CI workflow, and deployment preparation (complete locally; hosted CI unverified).
+6. **M6A:** GitHub repository review, CI workflow, and deployment preparation (complete; hosted PR CI verified).
 7. **M6B:** Approved Azure provisioning, OIDC deployment pipeline and real service verification (not started).
 
 No Azure resources, paid services, deployment workflows, or publishing are part
