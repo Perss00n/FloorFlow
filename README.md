@@ -2,12 +2,13 @@
 
 FloorFlow is a small application inspired by flooring contracting. It shows
 customers, orders, materials, and labor, with an AI assistant for sales questions.
-This repository implements **M1 through M5**: local PostgreSQL, schema, seed data,
+This repository implements **M1 through M5 and M6A preparation**: local PostgreSQL, schema, seed data,
 an Express health endpoint, a read-only REST API, and a responsive frontend for
 browsing customers and orders. The home page includes an Azure Foundry database
 assistant with structural SQL validation and a separate read-only login.
 M5 adds optional preview authentication, production configuration guards,
 bounded shutdown, and targeted security and reliability regression tests.
+M6A adds CI-only GitHub Actions verification and a documented Azure deployment plan.
 **Real Azure integration has not been verified:** local tests use model mocks
 and actual PostgreSQL, without paid API calls. Missing configuration returns 503.
 
@@ -29,6 +30,9 @@ are needed for them.
 
 ```text
 FloorFlow/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── .env.example
 ├── .gitattributes
 ├── .gitignore
@@ -45,8 +49,11 @@ FloorFlow/
 │   ├── API.md
 │   ├── ASSISTANT.md
 │   ├── AZURE_ACCEPTANCE.md
+│   ├── CI.md
+│   ├── DEPLOYMENT.md
 │   └── READINESS.md
 ├── scripts/
+│   ├── check-syntax.js
 │   └── setup-assistant-db.js
 ├── public/
 │   ├── index.html
@@ -477,7 +484,48 @@ HTTPS-only ingress and its explicit proxy networks, non-admin database logins an
 verified PostgreSQL TLS, protected health probes, secrets and provider budgets.
 `NODE_ENV=production` defaults to `0.0.0.0`; `HOST` can override it. Startup accepts
 host environment variables without `.env`. Actual Azure hosting and a real
-deployed model remain unverified. No cloud resources or pipelines exist here.
+deployed model remain unverified. No cloud resources or deployment pipeline exist here.
+
+## M6A: GitHub Actions and deployment preparation
+
+The existing `Perss00n/FloorFlow` repository remains private. The CI-only workflow
+in `.github/workflows/ci.yml` runs on pushes to `main` and pull requests targeting
+`main`. It installs Node 24 and locked dependencies, creates a fresh PostgreSQL
+18 database using existing Compose/schema/seed files, configures the restricted
+AI role, checks all JavaScript syntax, runs every test and `npm audit`, and removes
+its isolated database/volume. Passwords are randomly generated and masked per
+run; no GitHub secrets or `.env` file are needed. Azure variables are blank.
+
+Equivalent checks with the existing local development configuration:
+
+```powershell
+docker compose up -d --wait db
+npm ci
+npm run db:assistant:setup
+npm run check:syntax
+npm test
+npm audit
+docker compose config --quiet
+```
+
+See [CI.md](docs/CI.md) for CI environment variables, isolated-run cleanup and
+secret-review findings. On **2026-11-18**, workflow validation passed with
+`actionlint`, all **39 JS files** passed syntax checks, and all **264 tests** passed
+on Windows and in a fresh native-Linux replay without `.env`. The audit found
+zero known vulnerabilities. **GitHub-hosted execution remains unverified until
+an approved push.** Application code, tests, schema and seed data are unchanged.
+
+The recommended short-lived demo is Linux App Service **F1**, PostgreSQL Flexible
+Server **18 / B1ms / 32 GiB**, and a small Azure Foundry pay-per-token model,
+preferably with all resource locations in Sweden Central. Public retail estimates
+are about **188 SEK/month** for database + F1; optional Linux App Service B1 adds
+about **130 SEK/month**. Model calls, extras, tax and subscription/FX differences
+are separate. The available approximately **2,000 SEK credits expire December 16,
+2026**; capacity, price, credit eligibility and a removal date must be confirmed
+before provisioning. See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for cited rates,
+F1 limitations, managed-role/TLS adjustments, protected health checks, and the
+planned CI-gated OIDC deployment. M6B still requires approval and actual Azure
+compatibility/model testing; nothing is deployed or provisioned in M6A.
 
 ## Milestones
 
@@ -486,7 +534,8 @@ deployed model remain unverified. No cloud resources or pipelines exist here.
 3. **M3:** Static HTML/CSS/vanilla JavaScript frontend served by Node (complete).
 4. **M4:** Azure Foundry assistant with controlled read-only SQL execution (complete locally; live Azure unverified).
 5. **M5:** Broader automated tests, security review, and code quality (complete locally).
-6. **M6:** GitHub Actions and Azure App Service deployment.
+6. **M6A:** GitHub repository review, CI workflow, and deployment preparation (complete locally; hosted CI unverified).
+7. **M6B:** Approved Azure provisioning, OIDC deployment pipeline and real service verification (not started).
 
 No Azure resources, paid services, deployment workflows, or publishing are part
-of M5. Implementation stops here until M6 is explicitly approved.
+of M6A. Implementation stops here until M6B is explicitly approved.

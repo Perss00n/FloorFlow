@@ -6,3 +6,27 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+
+# Local credentials, keys, and provider configuration.
+.npmrc
+.pgpass
+.pg_service.conf
+.azure/
+*.key
+*.pem
+*.pfx
+*.p12
+*.publishsettings
+
+# Temporary files, database backups, and deployment archives.
+.tmp/
+tmp/
+*.tmp
+*.bak
+*.dump
+*.backup
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
