@@ -7,6 +7,51 @@ deployment identity or deployment workflow was created. The repository remains
 private; application code and tests are unchanged. These documentation changes
 have not been committed or pushed by this stage.
 
+## Stage 5 preflight: bootstrap blocked before execution
+
+On **2026-11-18**, read-only Azure checks confirmed the expected active
+subscription, Ready PostgreSQL **18** server, original **13 exact application-IP
+rules**, required TLS and minimum TLS 1.2. `temp_file_limit` remains **-1**;
+Azure reports it as dynamic with no restart pending. The saved administrator
+credential exists, but was not decrypted or sent to PostgreSQL in this stage.
+Node.js **24.19.0** and the existing `pg` client are available; no software was
+installed. Stage 4 documentation was already preserved in commit `7bc78b1`.
+
+The execution environment's automatic approval review rejected both the combined
+temporary-firewall/inspection/cleanup command and a smaller targeted attempt,
+before either command started. Its only diagnostic was **“blocked by policy.”**
+No temporary rule was created, no database connection was made, and no SQL or
+server-parameter changes were executed. Final readbacks confirmed the original
+13 rules unchanged, no temporary rule, the server Ready and four existing
+top-level Azure resources with no additions.
+
+**Stage 5 is incomplete.** Actual databases, roles, administrator SQL capabilities,
+schema/data, client-side TLS verification, runtime permissions and inherited
+resource limits have not been inspected or verified against Azure PostgreSQL.
+No seed totals or runtime-role tests were run. A temporary read-only Node
+inspection script outside the repository passed `node --check`; it did not run
+against Azure. No application or test source changed, and no commit/push occurred.
+
+Resume only after the authorized temporary network access and credentialed
+inspection can execute in a permitted operator session. Inspect actual database
+contents and administrator capabilities first; then follow the managed bootstrap
+and cleanup gates below. No subscription/billing upgrade, extra resource,
+application deployment or model call is needed to resolve this execution block.
+
+## Stage 5A: manual read-only inspection prepared
+
+The operator procedure is [POSTGRESQL_INSPECTION.md](POSTGRESQL_INSPECTION.md).
+It uses `scripts/inspect-azure-db.ps1` and the reviewed project-local
+`scripts/inspect-azure-db.js`, superseding the temporary `inspect.mjs` draft.
+Firewall setup/removal are manual Portal steps; the scripts contain no Azure
+management operations. The database work is limited to verified-TLS, read-only
+metadata inspection with sanitized output. No procedure, credential import,
+Azure connection or SQL was executed while preparing Stage 5A. Offline helper
+tests and syntax checks are recorded in the runbook. Await the operator's
+sanitized results and cleanup confirmation before designing the Azure bootstrap.
+The bootstrap outline below remains an earlier plan, not a reviewed executable
+procedure or proof of managed-provider permissions.
+
 ## Verified Stage 4 resources
 
 The selected subscription was rechecked as Enabled/Active with Owner access,
