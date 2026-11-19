@@ -63,6 +63,30 @@ används för sista pushens publika leveranskontroll; inga UI- eller affärsregl
 De namngivna körningarna ovan gäller den första driftverifieringen.
 Aktuell SHA och CI-run läses från serverns `installed.json` och GitHubs CI-historik.
 
+### Avslutande apprelease och publik kontroll
+
+[CI 44630880670](https://github.com/Perss00n/FloorFlow/actions/runs/44630880670)
+för **e74d8a1c33f946424d4f15a55e7018a89c226159** passerade med 338 Node-tester,
+22 Linux-deploymenttester, noll överhoppade Node-tester och npm audit utan
+sårbarheter. Timern hämtade och installerade releasen utan manuell start:
+`installed.json` registrerade success **2026-11-19 22:42:00 UTC**, CI-attempt 1.
+Källarkivets SHA-256 var
+`d4df11e801f8ec37c6c115aa788890276a35f1b58dd09920c97b25725c666f03`.
+
+- Alla 38 installerade källfiler matchade denna Git-commit. Installerade
+  privilegierade scripts/enheter jämfördes också med repositoryversionerna.
+- **30/30 publika HTTP-kontroller passerade igen**, inklusive autentisering,
+  statiska filer, kund-/order-API, DB-health och säkra fel utan modellstart.
+  HTML-kommentaren från slutpushen återlästes över autentiserad publik HTTPS.
+- **Riktig Chrome** visade fem kunder, Maple Property Groups tre order samt
+  FF-2026-001 med fyra orderrader och **36 117,00 SEK**. Ingen AI-fråga skickades.
+- runtime.env, AI-budgetfil och skyddade Laravel-/Cloudflare-filer matchade
+  fortfarande sina ursprungliga hashvärden. Samma Laravel-containrar och samma
+  cloudflared-PID/starttid; Laravel svarade 200. Både 09 och föregående git-release
+  behölls. Timer, Docker och cloudflared var aktiva och boot-aktiverade.
+
+Efterföljande dokumentationspush ändrar inga av de 38 applikationsfilerna.
+
 ## Avveckling och kvarvarande gränser
 
 - Gamla `.github/workflows/deploy.yml` är borttaget efter ovan verifierade Ubuntu-byte.
