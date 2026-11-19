@@ -69,25 +69,20 @@ a wrong business conclusion. Inspect the SQL and evaluate the real deployment
 before relying on its answers. Prompt injection is treated as untrusted input;
 the security boundary remains validation plus database permissions and limits.
 
-## Local read-only login setup
+## Read-only login and local tests
 
-Use the existing local Docker database. Do not run this setup against a shared
-or production database without reviewing its permission changes.
-For Azure Flexible Server, follow the [managed-provider plan](DEPLOYMENT.md#managed-postgresql-bootstrap-required-m6b-work);
-the local superuser setup is not assumed to work unchanged on a managed service.
+The deployed Azure roles are already configured. Ordinary application updates do
+not create roles or run database setup; follow [HYBRID_DEPLOYMENT.md](HYBRID_DEPLOYMENT.md).
+The old general-purpose local setup script has been retired.
 
-1. In the ignored `.env`, set `AI_PGUSER=floorflow_ai` and a new
-   `AI_PGPASSWORD` different from `PGPASSWORD`. Never commit real credentials.
-2. Start PostgreSQL, install locked dependencies, and run the setup with the
-   existing application's local database-owner/superuser connection:
+For a fresh disposable test database, follow [CI.md](CI.md) and run
+`npm run db:test:setup`. Its fixture lives in `.github/scripts/setup-test-db.js` and
+requires `NODE_ENV=test`, `PGHOST=127.0.0.1`, and database/user `floorflow_ci`.
+It refuses other targets before connecting. Existing development installations
+with a configured `floorflow_ai` login can continue to run `npm test` unchanged.
+`AI_PGPASSWORD` must differ from `PGPASSWORD`; never commit real credentials.
 
-```powershell
-docker compose up -d --wait
-npm ci
-npm run db:assistant:setup
-```
-
-The script creates or reconfigures the dedicated login, grants schema usage and
+The test fixture creates or reconfigures the dedicated login, grants schema usage and
 SELECT on exactly the four application tables, removes direct table/sequence
 privileges, and configures conservative defaults. It refuses an existing role
 with administrative flags, memberships, or object ownership. It does not modify
@@ -95,10 +90,10 @@ schema definitions or seed rows. Re-running it applies the current local passwor
 
 PostgreSQL grants temporary-table privileges to `PUBLIC` by default. A per-role
 REVOKE cannot override a grant inherited from `PUBLIC`, so the setup revokes
-database CREATE/TEMPORARY and public-schema CREATE from `PUBLIC` in **FloorFlow's
-database**. The existing database owner retains its privileges. This affects
+database CREATE/TEMPORARY and public-schema CREATE from `PUBLIC` in the disposable
+**floorflow_ci database**. The existing database owner retains its privileges. This affects
 other non-owner logins in that database, which is why the procedure is intended
-for the dedicated local development database.
+only that isolated test database.
 
 The application uses a separate two-connection pool with this login. It refuses
 the normal application account and also refuses equal normal/AI passwords.

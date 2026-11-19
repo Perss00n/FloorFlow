@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 let checked = 0;
-for (const directory of ['src', 'public/js', 'scripts', 'test']) {
+for (const directory of ['src', 'public/js', 'scripts', '.github/scripts', 'test']) {
   for (const entry of readdirSync(directory, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
     const file = join(entry.parentPath, entry.name);

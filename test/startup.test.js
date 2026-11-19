@@ -88,13 +88,27 @@ test('invalid runtime configuration is identified before database access', { tim
   assert.doesNotMatch(instance.output(), /secret-invalid-port|secret-password-must-not-appear|\n\s+at /);
 });
 
-test('the role setup script handles connection failure without a raw error or password', { timeout: 10000 }, async (context) => {
-  const script = fileURLToPath(new URL('../scripts/setup-assistant-db.js', import.meta.url));
-  const instance = await launch(context, { PGPORT: '1', AI_PGPASSWORD: 'test-only-admin-secret' }, script);
+test('the CI role fixture handles connection failure without a raw error or password', { timeout: 10000 }, async (context) => {
+  const script = fileURLToPath(new URL('../.github/scripts/setup-test-db.js', import.meta.url));
+  const instance = await launch(context, { NODE_ENV: 'test', PGHOST: '127.0.0.1', PGDATABASE: 'floorflow_ci',
+    PGUSER: 'floorflow_ci', PGPORT: '1', PGPASSWORD: 'test-only-owner-secret', AI_PGUSER: 'floorflow_ai',
+    AI_PGPASSWORD: 'test-only-admin-secret' }, script);
   const [code] = await instance.exited;
   assert.equal(code, 1);
-  assert.match(instance.output(), /Assistant database setup failed/);
+  assert.match(instance.output(), /Test database setup failed/);
   assert.ok(!instance.output().includes('test-only-admin-secret'));
   assert.ok(!instance.output().includes('ECONNREFUSED'));
   assert.ok(!instance.output().includes('at '));
+});
+
+test('the CI role fixture rejects non-test, remote or non-CI targets before connecting', { timeout: 10000 }, async (context) => {
+  const script = fileURLToPath(new URL('../.github/scripts/setup-test-db.js', import.meta.url));
+  for (const change of [{ NODE_ENV: 'production' }, { PGHOST: 'unapproved.example' },
+    { PGDATABASE: 'floorflow' }, { PGUSER: 'floorflow_app' }]) {
+    const instance = await launch(context, { NODE_ENV: 'test', PGHOST: '127.0.0.1', PGDATABASE: 'floorflow_ci',
+      PGUSER: 'floorflow_ci', PGPORT: '1', PGPASSWORD: 'test-only-secret', ...change }, script);
+    assert.equal((await instance.exited)[0], 1);
+    assert.match(instance.output(), /Test database setup requires NODE_ENV=test and the local floorflow_ci database\/user/);
+    assert.doesNotMatch(instance.output(), /Test database setup failed|test-only-secret|ECONNREFUSED|unapproved\.example|\n\s+at /);
+  }
 });

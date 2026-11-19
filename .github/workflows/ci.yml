@@ -64,8 +64,8 @@ jobs:
           docker compose --env-file /dev/null config --quiet
           docker compose --env-file /dev/null up -d --wait --wait-timeout 90 db
 
-      - name: Set up the restricted AI database role
-        run: npm run db:assistant:setup
+      - name: Set up the restricted AI role in the disposable test database
+        run: npm run db:test:setup
 
       - name: Check JavaScript syntax
         run: npm run check:syntax

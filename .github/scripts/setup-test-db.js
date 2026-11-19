@@ -1,8 +1,14 @@
-import { pool } from '../src/db.js';
+// Disposable CI fixture only; production credentials and databases are refused before connecting.
+if (process.env.NODE_ENV !== 'test' || process.env.PGHOST !== '127.0.0.1'
+    || process.env.PGDATABASE !== 'floorflow_ci' || process.env.PGUSER !== 'floorflow_ci') {
+  console.error('Test database setup requires NODE_ENV=test and the local floorflow_ci database/user.');
+  process.exit(1);
+}
+const { pool } = await import('../../src/db.js');
 
 const password = process.env.AI_PGPASSWORD;
 if (process.env.AI_PGUSER !== 'floorflow_ai' || !password || password === process.env.PGPASSWORD) {
-  console.error('Set AI_PGUSER=floorflow_ai and a separate AI_PGPASSWORD in .env first.');
+  console.error('Set AI_PGUSER=floorflow_ai and a separate AI_PGPASSWORD for the test database.');
   await pool.end();
   process.exit(1);
 }
@@ -57,7 +63,7 @@ try {
   if (client) {
     try { await client.query('ROLLBACK'); } catch { discard = true; }
   }
-  console.error('Assistant database setup failed. Check the admin connection, separate password, and existing role permissions.');
+  console.error('Test database setup failed. Check the local connection, separate password, and existing role permissions.');
   if (/^[0-9A-Z]{5}$/.test(error.code ?? '')) console.error(`PostgreSQL error code: ${error.code}`);
   process.exitCode = 1;
 } finally {

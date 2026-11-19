@@ -10,7 +10,7 @@ import { createAssistantRouter } from '../src/routes/assistant.js';
 
 const readPool = createReadPool();
 before(async () => {
-  assert.ok(readPool, 'Set AI_PGUSER/AI_PGPASSWORD and run npm run db:assistant:setup before testing.');
+  assert.ok(readPool, 'Configure the restricted local AI role; for a disposable CI database run npm run db:test:setup.');
   await readPool.query('SELECT 1');
 });
 after(async () => {
@@ -382,7 +382,7 @@ test('the assistant form and module are public but its server code and setup scr
   const asset = await fetch(`${url}/js/assistant.js`);
   assert.equal(asset.status, 200);
   assert.ok(!(await asset.text()).includes('AZURE_FOUNDRY_API_KEY'));
-  for (const path of ['/src/assistant/model.js', '/scripts/setup-assistant-db.js']) {
+  for (const path of ['/src/assistant/model.js', '/.github/scripts/setup-test-db.js']) {
     const response = await fetch(url + path);
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { error: 'Route not found.' });
