@@ -1,5 +1,32 @@
 import { isIP } from 'node:net';
 
+// Return only fixed labels. Never reflect a provider's message, code, or cause.
+export function startupFailureReason(error) {
+  switch (error?.code) {
+    case '28P01': return 'database-authentication-failed';
+    case '28000': return 'database-authorization-failed';
+    case '3D000': return 'database-missing';
+    case 'ENOTFOUND':
+    case 'EAI_AGAIN': return 'dns-failed';
+    case 'ECONNREFUSED': return 'connection-refused';
+    case 'ECONNRESET': return 'connection-reset';
+    case 'ETIMEDOUT': return 'connection-timeout';
+    case 'EADDRINUSE': return 'address-in-use';
+    case 'EACCES': return 'permission-denied';
+    case 'CERT_HAS_EXPIRED':
+    case 'DEPTH_ZERO_SELF_SIGNED_CERT':
+    case 'SELF_SIGNED_CERT_IN_CHAIN':
+    case 'UNABLE_TO_GET_ISSUER_CERT':
+    case 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY':
+    case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+    case 'ERR_TLS_CERT_ALTNAME_INVALID': return 'tls-verification-failed';
+    default:
+      // pg's connection deadline can arrive without a code.
+      return error?.message === 'Connection terminated due to connection timeout'
+        ? 'connection-timeout' : 'unclassified';
+  }
+}
+
 // Process configuration stays separate from createApp so HTTP tests need no secrets.
 export function readRuntimeConfig(env = process.env) {
   const environment = env.NODE_ENV || 'development';

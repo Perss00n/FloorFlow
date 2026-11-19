@@ -60,6 +60,7 @@ test('a database startup failure exits safely without connection details', { tim
   const [code] = await instance.exited;
   assert.equal(code, 1);
   assert.match(instance.output(), /Cannot start FloorFlow/);
+  assert.match(instance.output(), /stage=database reason=connection-refused/);
   assert.ok(!instance.output().includes('test-only-secret-must-not-appear'));
   assert.ok(!instance.output().includes('ECONNREFUSED'));
   for (const name of privateDatabaseNames) assert.ok(!instance.output().includes(`${name}=`));
@@ -73,7 +74,18 @@ test('an occupied HTTP port fails startup and releases database resources', { ti
   const [code] = await instance.exited;
   assert.equal(code, 1);
   assert.match(instance.output(), /Cannot start FloorFlow/);
+  assert.match(instance.output(), /stage=listening reason=address-in-use/);
   assert.ok(!instance.output().includes('EADDRINUSE'));
+});
+
+test('invalid runtime configuration is identified before database access', { timeout: 10000 }, async (context) => {
+  const instance = await launch(context, { PORT: 'secret-invalid-port', PGPORT: '1',
+    PGPASSWORD: 'secret-password-must-not-appear' });
+  const [code] = await instance.exited;
+  assert.equal(code, 1);
+  const failureLine = instance.output().split(/\r?\n/).find((line) => line.startsWith('Cannot start FloorFlow.'));
+  assert.equal(failureLine, 'Cannot start FloorFlow. stage=configuration reason=unclassified.');
+  assert.doesNotMatch(instance.output(), /secret-invalid-port|secret-password-must-not-appear|\n\s+at /);
 });
 
 test('the role setup script handles connection failure without a raw error or password', { timeout: 10000 }, async (context) => {

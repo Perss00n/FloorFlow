@@ -1,11 +1,33 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readRuntimeConfig } from '../src/runtime.js';
+import { readRuntimeConfig, startupFailureReason } from '../src/runtime.js';
 
 const production = {
   NODE_ENV: 'production', PREVIEW_USERNAME: 'reviewer',
   PREVIEW_PASSWORD: 'test-only-long-password', PGSSLMODE: 'verify-full',
 };
+
+test('startup diagnostics classify known failures without reflecting error details', () => {
+  const cases = {
+    '28P01': 'database-authentication-failed', '28000': 'database-authorization-failed',
+    '3D000': 'database-missing', ENOTFOUND: 'dns-failed', EAI_AGAIN: 'dns-failed',
+    ECONNREFUSED: 'connection-refused', ECONNRESET: 'connection-reset', ETIMEDOUT: 'connection-timeout',
+    EADDRINUSE: 'address-in-use', EACCES: 'permission-denied',
+    CERT_HAS_EXPIRED: 'tls-verification-failed', DEPTH_ZERO_SELF_SIGNED_CERT: 'tls-verification-failed',
+    SELF_SIGNED_CERT_IN_CHAIN: 'tls-verification-failed', UNABLE_TO_GET_ISSUER_CERT: 'tls-verification-failed',
+    UNABLE_TO_GET_ISSUER_CERT_LOCALLY: 'tls-verification-failed',
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'tls-verification-failed', ERR_TLS_CERT_ALTNAME_INVALID: 'tls-verification-failed',
+  };
+  for (const [code, reason] of Object.entries(cases)) {
+    assert.equal(startupFailureReason({ code, message: 'secret-password SELECT private_data',
+      cause: new Error('secret-provider-details') }), reason);
+  }
+  assert.equal(startupFailureReason(new Error('Connection terminated due to connection timeout')), 'connection-timeout');
+  for (const error of [undefined, null, new Error('secret-password'),
+    { code: 'secret-token', message: 'SELECT private_data', cause: { code: '28P01' } }]) {
+    assert.equal(startupFailureReason(error), 'unclassified');
+  }
+});
 
 test('runtime defaults preserve local behavior and allow host/port overrides', () => {
   const local = readRuntimeConfig({});
