@@ -1,0 +1,40 @@
+name: floorflow
+services:
+  app:
+    image: floorflow:${FLOORFLOW_RELEASE:?Set FLOORFLOW_RELEASE in .env}
+    build:
+      context: ./current
+      dockerfile: deploy/ubuntu/Dockerfile
+    env_file:
+      - path: ./config/runtime.env
+        format: raw
+    ports:
+      - "127.0.0.1:3302:3000"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 256m
+    cpus: 0.75
+    pids_limit: 100
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks: [floorflow]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health',{headers:{authorization:'Basic '+Buffer.from(process.env.PREVIEW_USERNAME+':'+process.env.PREVIEW_PASSWORD).toString('base64'),'X-Forwarded-Proto':'https'},signal:AbortSignal.timeout(6000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 15s
+networks:
+  floorflow:
+    ipam:
+      config:
+        - subnet: 172.29.44.0/28
+          gateway: 172.29.44.1

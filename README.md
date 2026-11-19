@@ -9,8 +9,12 @@ assistant with structural SQL validation and a separate read-only login.
 M5 adds optional preview authentication, production configuration guards,
 bounded shutdown, and targeted security and reliability regression tests.
 M6A adds CI-only GitHub Actions verification and a documented Azure deployment plan.
-**Real Azure integration has not been verified:** local tests use model mocks
-and actual PostgreSQL, without paid API calls. Missing configuration returns 503.
+**Current deployment (2026-11-19):** the application runs independently in Ubuntu
+Docker at **https://floorflow.marcuslehm.se/**, with the existing PostgreSQL and
+real GPT-5-mini deployment in Azure. See [the hybrid operations guide](docs/HYBRID_DEPLOYMENT.md)
+for verified results, authentication, start/stop/update commands and limitations.
+The milestone notes below describe earlier preparation. Automated local tests still
+use model mocks and local PostgreSQL; they do not spend Azure model credit.
 
 ## Technologies and prerequisites
 

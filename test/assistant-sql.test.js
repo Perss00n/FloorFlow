@@ -20,6 +20,16 @@ test('safe SELECT queries are regenerated, qualified, parameterized and bounded'
   assert.match(validateSql('SELECT id FROM customers LIMIT 1000000').text, /LIMIT \(51\)/);
 });
 
+test('live model schema.table.column output stays rejected and the instructed alias form stays bounded', () => {
+  const rejectedSql = "SELECT ROUND(COALESCE(SUM(ROUND(public.order_items.quantity * public.order_items.unit_price, 2)), 0), 2) AS total_revenue_sek FROM public.order_items INNER JOIN public.orders ON public.order_items.order_id = public.orders.id WHERE public.orders.status = 'completed';";
+  assert.throws(() => validateSql(rejectedSql), (error) => error.status === 422);
+  const query = validateSql("SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_revenue_sek FROM public.order_items AS oi INNER JOIN public.orders AS o ON oi.order_id = o.id WHERE o.status = 'completed'");
+  assert.deepEqual(query.values, ['completed']);
+  assert.match(query.text, /public.order_items/);
+  assert.match(query.text, /public.orders/);
+  assert.match(query.text, /LIMIT \(51\)/);
+});
+
 test('semicolons, comments and quotes in string values remain bound data', () => {
   const query = validateSql("SELECT name FROM customers WHERE name = 'O''Brien; DROP TABLE customers; --'");
   assert.deepEqual(query.values, ["O'Brien; DROP TABLE customers; --"]);

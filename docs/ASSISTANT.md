@@ -2,11 +2,13 @@
 
 ## Current verification status
 
-The feature is implemented, but **no real Azure model call has been made**.
-Azure configuration is blank locally. Tests use deterministic model responses
+Real Azure model calls and the separate Azure PostgreSQL role were verified from
+the Ubuntu hybrid deployment on **2026-11-19**. See [the operations guide](HYBRID_DEPLOYMENT.md)
+for the current live checks and their limits, including a safely rejected SQL response.
+Local Azure configuration remains separate. Tests use deterministic model responses
 and an intercepted OpenAI SDK transport; database integration tests use the real
 local PostgreSQL server and the real restricted login. Passing these tests does
-not establish compatibility with a particular Azure deployment or its SQL quality.
+not establish compatibility with every model response or its SQL quality.
 There is no production mock mode, provider fallback, or fabricated answer when
 Azure is unavailable. The endpoint returns HTTP 503 when configuration is absent.
 
