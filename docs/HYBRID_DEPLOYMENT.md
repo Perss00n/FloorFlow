@@ -5,10 +5,11 @@ PostgreSQL och den verkliga GPT-5-mini-modellen finns kvar i Azure. App Service
 används inte av denna installation. Äldre M6-/App Service-dokument beskriver
 tidigare förberedelser och är inte driftinstruktionen för den här demon.
 
-Senast publicerat: **20261119-05**, efter AI-kvalitetsgenomgången. Läs
-[AI-kvalitetsrapporten](AI_QUALITY_REVIEW_2026-11-19.md) för exakt alla 20 riktiga
-modelltester: **13 godkända, fem 502 och två 422**. Driftförbättringarna är
-verifierade, men AI-assistenten är inte fullt acceptansgodkänd.
+Senast publicerat: **20261119-08**, med förtydligad mängd-SQL och
+`reasoning_effort=low`. Se [den riktade felundersökningen](AI_FAILURE_INVESTIGATION_2026-11-19.md):
+sex av sju tidigare misslyckade frågor har lyckade omtester, men obefintlig kund
+ger fortfarande 422. **AI-acceptansen är inte godkänd.** Den tidigare breda
+omgångens 20 frågor finns oförändrade i [kvalitetsrapporten](AI_QUALITY_REVIEW_2026-11-19.md).
 
 ## Arkitektur och avgränsning
 
@@ -82,7 +83,9 @@ Befintligt abonnemang och resursgrupp `rg-floorflow-demo` är oförändrade.
   `gpt-5-mini` / `2025-08-07`, GlobalStandard, befintlig kapacitet 10.
 - Endpoint: `https://oai-floorflow-demo-6e9587.openai.azure.com/openai/v1/`.
   Befintlig kod använder Chat Completions med strikt JSON-schema, inga retries,
-  20 sekunders timeout och högst 1 200 completion-tokens.
+  20 sekunders timeout och högst 1 200 completion-tokens, inklusive reasoning.
+  Sedan release 08 anges `reasoning_effort=low` uttryckligen. Ingen annan
+  modellparameter eller kvot har ändrats i den riktade undersökningen.
 - OpenAI ändrades från `publicNetworkAccess=Disabled`, default `Deny`, inga IP-regler,
   till **Enabled + defaultAction=Deny + exakt IP-regeln 81.235.27.27**.
   Inga tillåtande nätverksintervall eller Azure-services-bypass lades till.
@@ -171,6 +174,8 @@ behöver hållas öppen. Befintlig cloudflared publicerar åter routen efter sin
   Modellinstruktionen förtydligades i release `20261119-03`: använd tabellalias
   och `alias.kolumn`, aldrig `schema.tabell.kolumn`. Ändra inte valideringen för
   att släppa igenom en avvisad fråga.
+  Release 07 förtydligar också SUM utan ROUND för mängder: ROUND med precision 3
+  stöds inte. Frågor om obefintlig kund har fortfarande ett känt 422-fel.
 - **429:** vänta enligt `Retry-After`. Gränserna är **12 giltiga frågeförsök per
   klient-IP/60 s, 100 modellstarter per UTC-kalendertimme, 200 per UTC-dygn,
   två aktiva arbeten och högst fyra väntande i FIFO-kö i högst fem sekunder**.
@@ -183,8 +188,12 @@ behöver hållas öppen. Befintlig cloudflared publicerar åter routen efter sin
   filrättigheter och innehållets format utan att nollställa räknarna. Återställ
   senaste bevarade korrekta räknarfil vid korruption. Vanliga webb-API fungerar
   även när AI-budgetfilen inte kan läsas/skrivas.
-- **AI 502/icke-JSON:** fem av 20 verkliga modelltester gav detta fel; grundorsaken
-  är inte fastställd. Klienten visar nu ett sanerat tjänstefel och kan återanvändas.
+- **AI 502/icke-JSON:** vid ett reproducerat fall tog alla 1200 completion-tokens
+  slut i reasoning (`finishReason=length`, `contentChars=0`). Node gav ett hanterat
+  JSON-fel och Cloudflare-kedjan visade i stället HTML. Metadata finns som
+  `floorflow-model-result` i app-loggen; frågor/SQL/resultat loggas inte.
+  Alla fem historiska 502 har inte kunnat få en säker individuell förklaring.
+  Klienten visar ett sanerat tjänstefel och kan återanvändas.
   Ett misslyckat startat modellanrop förbrukar fortfarande global budget.
 - **AI 503/504:** kontrollera den specifika OpenAI-IP-regeln, endpoint,
   deployment-namn och tillgänglig kredit. Ingen automatisk reservmodell används.
@@ -224,22 +233,23 @@ avvisas för separat granskning. `config/runtime.env` ligger utanför releaserna
 Tidigare image/källkod och `.env` bevaras. Vid fel efter bytet försöker skriptet
 återställa föregående release. Den automatiska felåterställningsgrenen har inte
 provocerats i drift. Den normala uppdateringsvägen har körts till frisk release
-**20261119-05**. Den första uppdateringens referens finns i
+**20261119-08**. Den första uppdateringens referens finns i
 `backups/update-20261119-02/previous-release.txt` och `release.env`.
 
-Manuell återgång från 05 till bevarad release 04, med samma budget-/köskydd:
+Manuell återgång från 08 till bevarad release 07, med samma budget-/köskydd:
 
 ```bash
 cd /home/marcus/apps/floorflow
-sudo ln -s releases/20261119-04 .current-restore
+sudo ln -s releases/20261119-07 .current-restore
 sudo mv -Tf .current-restore current
-sudo sed -i 's/^FLOORFLOW_RELEASE=.*/FLOORFLOW_RELEASE=20261119-04/' .env
+sudo sed -i 's/^FLOORFLOW_RELEASE=.*/FLOORFLOW_RELEASE=20261119-07/' .env
 sudo docker compose up -d --no-build --wait app
 ```
 
 Kontrollera därefter healthy, autentiserad publik frontend och API. Låt Compose,
 runtime-konfiguration och `state/ai-usage.json` vara kvar. Releaser före 04 saknar
-de nya gränserna. Compose ändrades separat och säkerhetskopierades vid 04, eftersom
+de nya gränserna. Release 07 återgår till standard-reasoning och kan åter ge de
+tidigare length-felen. Compose ändrades separat och säkerhetskopierades vid 04, eftersom
 den manuella uppdateraren avsiktligt avvisar en ändrad Compose-fil. Ingen ny
 deployment-automatik installerades. Uppdateraren inkluderar inte dokumentation;
 driftguiderna förvaras separat i serverns `docs/`.
@@ -252,7 +262,13 @@ gemensamma tunneln. Windows-reservdemon är bevarad och stoppades inte.
 
 ## Verifiering och återstående gränser
 
-Aktuell genomgång, slutlig release **20261119-05**:
+Senaste riktade felundersökningen gäller release **20261119-08**:
+322 lokala tester och 30 publika HTTP-kontroller passerade; sex av sju
+ursprungsfall har lyckade omtester och obefintlig kund har fortfarande 422.
+Se [felundersökningen](AI_FAILURE_INVESTIGATION_2026-11-19.md) för exakta
+bevisgränser, modellmetadata och den redovisade överträdelsen av anropsbudgeten.
+
+Föregående breda genomgång, slutlig release **20261119-05**:
 
 - **317/317 lokala tester**, noll överhoppade, och syntaxkontroll av 49 JS-filer.
 - Före publicering: autentiserade Ubuntu-kontroller; efter: 30 publika

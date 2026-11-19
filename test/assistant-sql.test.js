@@ -38,6 +38,14 @@ test('semicolons, comments and quotes in string values remain bound data', () =>
   assert.ok(!commented.text.includes('comment'));
 });
 
+test('captured live oak quantity SQL with ROUND(...,3) stays rejected', () => {
+  const captured = "SELECT ROUND(COALESCE(SUM(oi.quantity), 0), 3) AS total_engineered_oak_m2 FROM public.order_items AS oi INNER JOIN public.orders AS o ON oi.order_id = o.id INNER JOIN public.articles AS a ON oi.article_id = a.id WHERE o.status = 'completed' AND a.unit = 'm²' AND LOWER(a.name) LIKE '%engineered oak%';";
+  assert.throws(() => validateSql(captured), error => error.status === 422);
+  const supported = validateSql(captured.replace('ROUND(COALESCE(SUM(oi.quantity), 0), 3)', 'COALESCE(SUM(oi.quantity), 0)'));
+  assert.deepEqual(supported.values, ['completed', 'm²', '%engineered oak%']);
+  assert.ok(!supported.text.includes('round'));
+});
+
 const rejected = [
   '', 'SELECT', 'SELECT name FROM customers; SELECT name FROM articles',
   'INSERT INTO customers(name) VALUES (\'x\')', 'UPDATE customers SET name=\'x\'',

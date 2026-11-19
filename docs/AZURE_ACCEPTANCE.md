@@ -1,5 +1,12 @@
 # Real Azure model acceptance checklist
 
+**Later targeted follow-up:** release `20261119-08` uses an explicit low
+reasoning effort and a quantity-only prompt clarification. Six of the seven
+previous failing questions have successful targeted retests; the missing-customer
+question still returns HTTP 422. **Acceptance remains incomplete.** See the
+[failure investigation](AI_FAILURE_INVESTIGATION_2026-11-19.md), including its
+disclosed request-budget overrun. The original 20-call review below is historical.
+
 **Live review executed on 2026-11-19; not fully accepted.** The approved budget
 was exactly 20 real questions: **13 passed, five returned non-JSON HTTP 502,
 and two legitimate oak-quantity questions returned validation HTTP 422**.

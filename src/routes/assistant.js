@@ -10,6 +10,7 @@ export function createAssistantRouter(assistant, now = Date.now, { budget = crea
 
   router.post('/chat', express.json({ limit: '4kb', strict: true }), async (request, response) => {
     response.set('Cache-Control', 'no-store');
+    response.set('X-FloorFlow-Response', 'assistant');
     if (!request.is('application/json')) return response.status(415).json({ error: 'Send a JSON object containing a message.' });
     const body = request.body;
     if (!body || Array.isArray(body) || Object.keys(body).length !== 1 || typeof body.message !== 'string' || body.message.trim().length === 0 || body.message.length > 1000) {
@@ -44,6 +45,7 @@ export function createAssistantRouter(assistant, now = Date.now, { budget = crea
       if (response.destroyed) return;
       // Do not log questions, generated SQL, customer results, or provider error bodies.
       if (error instanceof AssistantError) {
+        console.info(JSON.stringify({ event: 'floorflow-assistant-error', status: error.status, format: 'json' }));
         if (error.status === 429) {
           const wait = Number.isSafeInteger(error.retryAfter) && error.retryAfter > 0 && error.retryAfter <= 86400 ? error.retryAfter : 60;
           response.set('Retry-After', String(wait));

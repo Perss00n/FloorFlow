@@ -1,5 +1,10 @@
 # FloorFlow: AI-kvalitet och belastning, 19 november 2026
 
+**Senare uppföljning:** se [den riktade felundersökningen](AI_FAILURE_INVESTIGATION_2026-11-19.md)
+för nya reproduktioner, bekräftad tokenexhaustion, ROUND(...,3)-avvisning och
+separata ändringar i releaserna 06–08. Nedanstående 20 testresultat är den
+ursprungliga omgången och skrivs inte om i efterhand.
+
 **Driftförbättringarna är publicerade, men AI-acceptansen är inte helt godkänd.**
 Exakt **20 modellfrågor** genomfördes: **13 godkända, 7 tekniska fel**. Inga
 affärsmässigt felaktiga belopp observerades bland de svar som faktiskt returnerades,

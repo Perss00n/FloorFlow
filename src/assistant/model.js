@@ -22,6 +22,9 @@ Pending, draft and cancelled orders are not completed sales. Use order_items.uni
 never the current articles.unit_price, for historical order values. Round each line with
 ROUND(quantity * unit_price, 2) BEFORE summing. Use COALESCE for empty sums and an outer
 ROUND(..., 2) for money totals. Quantities are decimal; do all arithmetic in PostgreSQL.
+ROUND supports precision 2 only, for money. For quantity totals use
+COALESCE(SUM(alias.quantity), 0) without ROUND or a precision/scale cast;
+PostgreSQL preserves the stored quantity decimals. Never round quantities to 2 or 3 decimals.
 For best-selling articles default to completed revenue in SEK, and include SKU and name.
 Never combine different article units into one quantity total. Do not equate a count of
 rows with revenue. Filtering a customer name uses a string literal, correctly SQL-escaped.
@@ -52,6 +55,7 @@ export async function generateSql(client, model, question) {
       model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: question }],
       max_completion_tokens: 1200,
+      reasoning_effort: 'low',
       response_format: {
         type: 'json_schema',
         json_schema: {
@@ -75,6 +79,14 @@ export async function generateSql(client, model, question) {
   const choice = completion?.choices?.[0];
   const content = choice?.message?.content;
   const toolCalls = choice?.message?.tool_calls;
+  // Aggregate diagnostics only: never log prompts, SQL, rows or provider error bodies.
+  const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 1000000 ? value : null;
+  console.info(JSON.stringify({ event: 'floorflow-model-result',
+    finishReason: ['stop', 'length', 'content_filter', 'tool_calls', 'function_call'].includes(choice?.finish_reason) ? choice.finish_reason : 'other',
+    promptTokens: count(completion?.usage?.prompt_tokens),
+    completionTokens: count(completion?.usage?.completion_tokens),
+    reasoningTokens: count(completion?.usage?.completion_tokens_details?.reasoning_tokens),
+    contentChars: typeof content === 'string' ? content.length : 0 }));
   if (!Array.isArray(completion?.choices) || completion.choices.length !== 1 || choice?.finish_reason !== 'stop'
     || typeof content !== 'string' || content.length > 8000 || choice.message.refusal
     || (toolCalls != null && (!Array.isArray(toolCalls) || toolCalls.length > 0))) {

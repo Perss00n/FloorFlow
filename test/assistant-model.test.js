@@ -30,6 +30,7 @@ test('the official SDK targets only the configured Azure v1 deployment with boun
     const body = JSON.parse(options.body);
     assert.equal(body.model, env.AZURE_FOUNDRY_MODEL);
     assert.equal(body.max_completion_tokens, 1200);
+    assert.equal(body.reasoning_effort, 'low');
     assert.equal(body.response_format.json_schema.strict, true);
     assert.equal(body.messages[1].content, 'How many customers?');
     return Response.json({ choices: [{ finish_reason: 'stop', message: { content: '{"sql":"SELECT COUNT(*) AS customer_count FROM customers"}' } }] });

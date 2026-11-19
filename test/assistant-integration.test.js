@@ -43,6 +43,18 @@ async function post(url, body, options = {}) {
 const salesSql = `SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)),0),2) AS total_sales_sek
   FROM orders o JOIN order_items oi ON oi.order_id=o.id WHERE o.status='completed'`;
 
+test('captured oak query without unsupported rounding preserves 118.500 m² under the read-only role', async () => {
+  const sql = "SELECT COALESCE(SUM(oi.quantity), 0) AS total_engineered_oak_m2 FROM public.order_items AS oi INNER JOIN public.orders AS o ON oi.order_id = o.id INNER JOIN public.articles AS a ON oi.article_id = a.id WHERE o.status = 'completed' AND a.unit = 'm²' AND LOWER(a.name) LIKE '%engineered oak%';";
+  const result = await executeReadQuery(readPool, sql);
+  assert.deepEqual(result.results, [{ total_engineered_oak_m2: '118.500' }]);
+});
+
+test('a supported missing-customer aggregate returns exact zero under the same unchanged validator and role', async () => {
+  const sql = "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'";
+  const result = await executeReadQuery(readPool, sql);
+  assert.deepEqual(result.results, [{ total_spent_sek: '0.00' }]);
+});
+
 test('question to mocked SDK to validated SQL to real restricted PostgreSQL returns completed sales', async (context) => {
   const assistant = createAssistant({ modelClient: mockModel(salesSql), model: 'mock-deployment', readPool });
   const url = await startApp(context, assistant);
