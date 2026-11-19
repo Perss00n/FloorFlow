@@ -35,6 +35,8 @@ The assistant turns natural-language questions into SQL. Before execution, the S
 
 The original assignment called for Azure App Service, but Azure subscription quota and capacity restrictions blocked that deployment. The working demo therefore runs in **Docker on an Ubuntu server**, published over HTTPS through **Cloudflare Tunnel**, while **PostgreSQL and the AI model remain in Microsoft Azure**.
 
+Pushes to `main` are tested by GitHub Actions before a source-only release is published. A separate Ubuntu timer pulls only the artifact verified for the current commit, checks its integrity, and updates FloorFlow with health checks and rollback. See [the deployment runbook](docs/HYBRID_DEPLOYMENT.md).
+
 FloorFlow uses fictional sample data, and its AI assistant is a prototype whose answers should be checked when accuracy matters.
 
 ## Documentation

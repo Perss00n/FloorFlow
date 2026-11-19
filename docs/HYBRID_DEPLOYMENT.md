@@ -5,7 +5,7 @@ PostgreSQL och den verkliga GPT-5-mini-modellen finns kvar i Azure. App Service
 används inte av denna installation. Äldre M6-/App Service-dokument beskriver
 tidigare förberedelser och är inte driftinstruktionen för den här demon.
 
-Senast publicerat: **20261119-09**. Den slutliga promptens tolv modelltester
+Verifierad baslinje före automatisk deployment: **20261119-09**. Aktuell release och commit läses från serverns installationsmetadata nedan. Den slutliga promptens tolv modelltester
 och tre publika eftertester passerade, inklusive obefintlig kund med `0.00 SEK`
 i Chrome. Se [AI_RELIABILITY_ACCEPTANCE](AI_RELIABILITY_ACCEPTANCE_2026-11-19.md)
 för samtliga 42 journalförda modellförsök i omgången, de upptäckta affärsfelen och exakt
@@ -203,67 +203,130 @@ behöver hållas öppen. Befintlig cloudflared publicerar åter routen efter sin
 - **AI 503/504:** kontrollera den specifika OpenAI-IP-regeln, endpoint,
   deployment-namn och tillgänglig kredit. Ingen automatisk reservmodell används.
 
-## Uppdatera separat och återställ
+## Automatisk publicering från GitHub main
 
-Ingen ny timer eller GitHub-automatik behövs för demon. Uppdatering sker manuellt
-med ett granskat paket från Windows; Laravels automatiska deployment berörs inte.
+En vanlig `git push origin main` startar **CI** i `.github/workflows/ci.yml`.
+Först måste syntax, alla Node-tester, Ubuntu-säkerhetstester och npm audit passera.
+Därefter bygger jobbet `ubuntu-release` ett källkodspaket från **exakt samma SHA**.
+PR-körningar producerar inga produktionspaket. Inget GitHub-jobb ansluter till Ubuntu.
 
-1. Granska arbetskopian och kör syntax/tester **mot lokal utvecklingsdatabas**, med
-   modellinställningarna tomma. Källkodspaketet inkluderar arbetskopians ändringar;
-   det innebär inte en commit eller push.
-2. Skapa en unik release, exempelvis `20261120-01`:
+Den separata `floorflow-deploy.timer` kontrollerar GitHub cirka var 90:e sekund,
+med början 90 sekunder efter boot. Den startar en kort `oneshot`-tjänst som själv
+hämtar metadata och paket över utgående HTTPS. SSH behöver inte vara öppet mot
+internet, ingen self-hosted runner används och ingen inloggad SSH-session krävs.
+Laravel använder sina egna oförändrade enheter och sitt eget Compose-projekt.
 
-```powershell
-python scripts/build-ubuntu-package.py 20261120-01
-scp .tmp/ubuntu/floorflow-20261120-01.tar.gz marcus@192.168.1.118:/home/marcus/apps/floorflow/incoming-20261120-01.tar.gz
-```
+Servern kräver den senaste push-CI-körningen för **aktuell main-SHA**, avslutad med
+`success`, samt ett artifact med rätt repository, SHA, körnings-ID och körningsförsök.
+Saknad, pågående, misslyckad eller avbruten CI ger ingen installation. Ett äldre grönt
+resultat gäller aldrig för en nyare commit eller ett senare misslyckat körningsförsök.
+Main/CI verifieras igen efter Docker-builden och direkt före releasebytet.
 
-På den här Windows-datorn finns också verifierad Python på
-`C:\Users\Perss\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe`
-om kommandot `python` pekar på Microsoft Store-genvägen. Använd då hela sökvägen
-med PowerShell-anropsoperatorn `&` före sökvägen.
+Paketets ZIP-SHA-256 jämförs med GitHubs autentiserade artifact-metadata. Manifestets
+commit/run/attempt kontrolleras, sedan kontrolleras källarkivets egen SHA-256.
+Arkiven har storleksgränser och nekas för dubletter, länkar, enheter, osäkra sökvägar,
+oväntade filer eller saknade basfiler. Endast tillåtna källfiler ingår; aldrig
+runtime.env, `.env`, budgetfil, credentials, Git, tester eller deployment-automatik.
+Compose måste vara byte-identisk med den installerade filen. Ändringar i Compose,
+systemd eller de privilegierade deployment-skripten installeras **separat efter granskning**.
 
-3. Läs SHA-256 från paketrapporten och kör på Ubuntu:
+`update.sh` bygger först, sparar föregående release och release-env, byter atomiskt
+`current` och `.env`, och uppdaterar endast tjänsten `app` i projektet `floorflow`.
+Compose väntar på den befintliga autentiserade `/health`-kontrollen med databasåtkomst.
+Tidigare releaser och images behålls. Runtime, state, databasroller och nätverk ändras inte.
+Två lås förhindrar parallella pollningar respektive överlapp med manuell uppdatering.
+
+Vid build-/valideringsfel behålls den körande releasen. Vid fel efter releasebyte
+återställs föregående version och dess hälsa kontrolleras. En beständig pending-markör
+medger återställning efter avbruten process/host. Misslyckad eller avbruten commit
+blockeras och byggs inte om vid varje timer-tick. Om rollback misslyckas pausas
+publiceringen för manuell kontroll. Ingen automatisk radering av gamla releaser sker;
+kontrollera diskutrymmet vid längre drift.
+
+### Installerade filer och status
+
+- `/usr/local/lib/floorflow/{deploy.py,release.py,update.sh}`: root-ägda operatörsskript.
+- `/home/marcus/apps/floorflow/update.sh`: samma granskade updaterare för manuell användning.
+- `/etc/systemd/system/floorflow-deploy.{service,timer}`: separata root-ägda enheter.
+- `/var/lib/floorflow-deploy/installed.json`: senast lyckade commit, release, CI-run och SHA-256.
+- `previous.json`: föregående lyckade installationsmetadata; `blocked.json`: nekade commits.
+- `attempt.json`: pågående försök; `paused`: beständig operatörspaus.
+- Baslinjebackup före automatiken: `backups/cicd-20261119/`. Release 09 behålls.
 
 ```bash
+ssh marcus@192.168.1.118
 cd /home/marcus/apps/floorflow
-sudo ./update.sh incoming-20261120-01.tar.gz 20261120-01 <SHA256-från-rapporten>
+readlink current
+sudo cat /var/lib/floorflow-deploy/installed.json
+sudo docker compose ps
+systemctl list-timers floorflow-deploy.timer
+sudo journalctl -u floorflow-deploy.service -n 80 --no-pager
+sudo journalctl -u floorflow-deploy.service -f
+
+# Kontrollera aktuell kandidat utan att installera eller bygga:
+sudo python3 /usr/local/lib/floorflow/deploy.py --check
 ```
 
-Paketeraren använder en explicit fillista och inkluderar inte `.env`, hemligheter,
-Git, tester, seeders eller databasverktyg. Servern verifierar SHA-256 och alla
-arkivposter, bygger först och byter sedan bara FloorFlow. Ändrad Compose-fil
-avvisas för separat granskning. `config/runtime.env` ligger utanför releaserna.
+### Pausa, återställ och återuppta
 
-Tidigare image/källkod och `.env` bevaras. Vid fel efter bytet försöker skriptet
-återställa föregående release. Den automatiska felåterställningsgrenen har inte
-provocerats i drift. Den normala uppdateringsvägen har körts till frisk release
-**20261119-09**. Den första uppdateringens referens finns i
-`backups/update-20261119-02/previous-release.txt` och `release.env`.
-
-Manuell återgång från 09 till bevarad release 08, med samma budget-/köskydd:
+Pausa innan manuella releaser, rollback eller operatörsändringar. Pausfilen består
+även över omstart; ett stoppat timer-objekt ensamt är inte en beständig boot-paus.
 
 ```bash
-cd /home/marcus/apps/floorflow
-sudo ln -s releases/20261119-08 .current-restore
-sudo mv -Tf .current-restore current
-sudo sed -i 's/^FLOORFLOW_RELEASE=.*/FLOORFLOW_RELEASE=20261119-08/' .env
-sudo docker compose up -d --no-build --wait app
+sudo touch /var/lib/floorflow-deploy/paused
+sudo systemctl stop floorflow-deploy.timer floorflow-deploy.service
+sudo ./update.sh --recover  # återställer endast om ett avbrutet byte finns
+
+# Rulla tillbaka till föregående bevarade, fungerande release:
+sudo ./update.sh --rollback
+sudo cp /var/lib/floorflow-deploy/previous.json /var/lib/floorflow-deploy/installed.json
+sudo docker compose ps
 ```
 
-Kontrollera därefter healthy, autentiserad publik frontend och API. Låt Compose,
-runtime-konfiguration och `state/ai-usage.json` vara kvar. Releaser före 04 saknar
-de nya gränserna. Release 08 har low-reasoning men saknar de senaste reglerna för
-kundsummor och namn-/beskrivningsmatchning. Compose ändrades separat och säkerhetskopierades vid 04, eftersom
-den manuella uppdateraren avsiktligt avvisar en ändrad Compose-fil. Ingen ny
-deployment-automatik installerades. Uppdateraren inkluderar inte dokumentation;
-driftguiderna förvaras separat i serverns `docs/`.
+Verifiera därefter autentiserad publik frontend och API. Budgetfilen och runtime
+ska vara kvar. Låt automatiken vara pausad tills main innehåller önskad rättning;
+annars kommer aktuell main avsiktligt installeras igen när den tillåts.
 
-Full avveckling: stoppa bara FloorFlow, ta bort bara dess hostname/CNAME i
-Cloudflare och regeln `floorflow-ubuntu-home` i PostgreSQL. Återställ vid behov
-OpenAI till dess sparade utgångsläge (Disabled, Deny, tom IP-lista), efter kontroll
-att ingen annan ny konsument behöver regeln. Radera inga Azure-resurser eller den
-gemensamma tunneln. Windows-reservdemon är bevarad och stoppades inte.
+Efter ett blockerat försök: läs journal och `blocked.json`, rätta grundfelet och
+pusha **en ny commit**. Det är den enkla återupptagningsvägen och bevarar historiken.
+Även en avsiktlig tom commit (`git commit --allow-empty -m "Retry verified deployment"`)
+kan skapa en ny grön CI efter att ett tillfälligt fel har rättats. Radera inte
+blocklistan, releases eller AI-budgeten för att kringgå ett oförklarat fel.
+
+```bash
+# När grundfelet är rättat och önskad main har godkänd CI:
+sudo rm /var/lib/floorflow-deploy/paused
+sudo systemctl reset-failed floorflow-deploy.service
+sudo systemctl enable --now floorflow-deploy.timer
+sudo systemctl start floorflow-deploy.service  # valfritt, annars nästa timer-tick
+```
+
+### GitHub-åtkomst och avbrott
+
+Credential är en separat **fine-grained PAT**, endast `Perss00n/FloorFlow`, med
+**Actions: Read-only, Contents: Read-only och obligatorisk Metadata: Read-only**.
+Den har inga skriv-/administrationsrättigheter och ger ingen SSH-/Docker-åtkomst.
+Tokenen ligger endast i `/etc/floorflow-deploy/github.token`, root:root 0600, i en
+0700-katalog. Den finns inte i Git, systemd-argument, miljöfiler, images eller loggar.
+Authorization skickas endast till `api.github.com`; den signerade artifact-hämtningen
+får ingen GitHub-token. TLS-verifiering är aktiv. Nätfel och API-fel loggas sanerat.
+
+Initial token: **FloorFlow Ubuntu read-only deployment**, utgångsdatum **2026-12-19**.
+Återkalla den under GitHub Settings → Developer settings → Personal access tokens →
+Fine-grained tokens. Förnya med samma repository och läsbehörigheter och ersätt den
+skyddade serverfilen via säker operatörsinmatning; skriv aldrig token i kommandoraden.
+Utgången/återkallad token stoppar framtida uppdateringar, medan den körande webbappen
+fortsätter. Inga GitHub-hemligheter behöver överföras till GitHub Actions.
+
+Efter Ubuntu-/internetavbrott återupptar timern kontrollerna. Bara aktuell main kan
+installeras; missade mellanversioner behöver inte publiceras. Artifacts behålls i
+30 dagar. Om senaste paketet har löpt ut: kör om CI för samma aktuella main eller
+pusha en ny commit. Reruns får egna artifacts med körnings-ID och attempt, så en
+äldre artifact aldrig används för en senare körning. Kontrollera tokenens giltighet,
+DNS/HTTPS, Docker och diskutrymme vid fel. Inga Azure-brandväggar ändras av automatiken.
+
+Det gamla Azure App Service-workflowet avvecklas efter verifierad Ubuntu-kedja.
+Azure PostgreSQL och OpenAI används fortsatt av appen och ska inte avvecklas.
 
 ## Verifiering och återstående gränser
 
