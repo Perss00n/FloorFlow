@@ -287,7 +287,8 @@ sudo docker compose ps
 
 Verifiera därefter autentiserad publik frontend och API. Budgetfilen och runtime
 ska vara kvar. Låt automatiken vara pausad tills main innehåller önskad rättning;
-annars kommer aktuell main avsiktligt installeras igen när den tillåts.
+pusha därefter en ny rättad commit före återupptagning. Försök inte installera om
+en tidigare bevarad release med samma namn via den automatiska updateraren.
 
 Efter ett blockerat försök: läs journal och `blocked.json`, rätta grundfelet och
 pusha **en ny commit**. Det är den enkla återupptagningsvägen och bevarar historiken.
@@ -327,8 +328,16 @@ pusha en ny commit. Reruns får egna artifacts med körnings-ID och attempt, så
 äldre artifact aldrig används för en senare körning. Kontrollera tokenens giltighet,
 DNS/HTTPS, Docker och diskutrymme vid fel. Inga Azure-brandväggar ändras av automatiken.
 
-Det gamla Azure App Service-workflowet avvecklas efter verifierad Ubuntu-kedja.
+Det gamla Azure App Service-workflowet `deploy.yml` är borttaget efter verifierad
+Ubuntu-kedja. Dess tre oanvända repository-variabler `AZURE_CLIENT_ID`,
+`AZURE_TENANT_ID` och `AZURE_SUBSCRIPTION_ID` har tagits bort efter referenskontroll
+och återlästs som frånvarande via GitHub API. Inga Actions-secrets eller environments
+fanns att rensa.
+CI har endast läsbehörighet och begär ingen OIDC/id-token.
 Azure PostgreSQL och OpenAI används fortsatt av appen och ska inte avvecklas.
+
+Genomförande och verifieringsunderlag finns i
+[UBUNTU_CICD_VERIFICATION_2026-11-19.md](UBUNTU_CICD_VERIFICATION_2026-11-19.md).
 
 ## Verifiering och återstående gränser
 

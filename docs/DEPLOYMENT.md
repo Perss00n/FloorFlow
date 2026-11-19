@@ -1,5 +1,9 @@
 # Azure deployment plan (M6C; manual App Service preparation)
 
+**Historical only:** the active CI/CD and Ubuntu operations guide is
+[HYBRID_DEPLOYMENT.md](HYBRID_DEPLOYMENT.md). App Service deployment has been retired;
+Azure PostgreSQL and Azure OpenAI remain in use.
+
 ## Current M6C status — 2026-11-19
 
 The operator reports PostgreSQL is installed and separately verified: correct

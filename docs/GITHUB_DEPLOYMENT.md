@@ -1,4 +1,8 @@
-# M6D: manuell GitHub Actions-publicering
+# Historik: M6D och Azure App Service
+
+**Avvecklat 2026-11-19.** `deploy.yml` har ersatts av CI-styrd Ubuntu-paketering
+och en separat pull-timer på servern. Följ [HYBRID_DEPLOYMENT.md](HYBRID_DEPLOYMENT.md)
+för aktuell drift. Texten nedan är historik; kör inte Azure-publiceringen.
 
 **Förberett 2026-11-19. Ingen publicering, Azure-ändring, identitet eller
 federerad credential har skapats. Inget har committats/pushats.** M6C-filerna och

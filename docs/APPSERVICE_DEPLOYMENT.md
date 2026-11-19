@@ -1,5 +1,8 @@
 # M6C: första manuella publiceringen till App Service
 
+**Historisk guide.** Azure App Service-publiceringen är avvecklad. Aktuell automatisk
+Ubuntu-deployment och drift beskrivs i [HYBRID_DEPLOYMENT.md](HYBRID_DEPLOYMENT.md).
+
 **Förberett 2026-11-19. Inte publicerat. Inga Azure-inställningar har ändrats.**
 Operatören uppger att PostgreSQL redan är installerad och separat verifierad,
 inklusive begränsade runtime-konton och TLS 1.3. Det är utgångspunkten här, inte
