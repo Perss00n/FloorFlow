@@ -9,6 +9,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -153,6 +154,22 @@ def poll(api, check_only=False):
         return
     attempt = read_json(STATE / 'attempt.json', None)
     if attempt and not check_only:
+        # The updater can finish just before the polling process is interrupted.
+        # Reconcile that narrow gap instead of rebuilding or claiming a rollback.
+        if not (ROOT / '.deployment-pending').exists() and (ROOT / 'current').readlink() == pathlib.Path('releases/' + attempt['release']):
+            health = subprocess.run(['docker', 'inspect', '--format', '{{.Config.Image}}|{{.State.Health.Status}}',
+                                     'floorflow-app-1'], capture_output=True, text=True, check=False)
+            if health.returncode or health.stdout.strip() != 'floorflow:' + attempt['release'] + '|healthy':
+                (STATE / 'paused').touch(mode=0o600)
+                raise DeploymentError('Interrupted completion is not healthy; operator review required.')
+            if installed:
+                write_json(STATE / 'previous.json', installed)
+            write_json(STATE / 'installed.json', attempt)
+            (STATE / 'attempt.json').unlink()
+            installed = attempt
+            print('Recovered successful installation metadata: ' + attempt['commit'][:12])
+            attempt = None
+    if attempt and not check_only:
         # A killed service or host reboot must never rebuild the interrupted commit.
         recovered = subprocess.run([UPDATER, '--recover'], check=False).returncode == 0
         blocked[attempt['commit']] = {'at': timestamp(), 'reason': 'Interrupted deployment'}
@@ -178,11 +195,14 @@ def poll(api, check_only=False):
     data = api.download(selected['artifact']['id'])
     source, manifest = unpack_artifact(data, selected)
     archive = ROOT / ('incoming-' + selected['release'] + '.tar.gz')
-    temporary = archive.with_suffix('.download')
-    with temporary.open('xb') as output:
-        output.write(source)
-    temporary.chmod(0o600)
-    temporary.replace(archive)
+    with tempfile.NamedTemporaryFile(dir=ROOT, prefix='.incoming-', suffix='.download', delete=False) as output:
+        temporary = pathlib.Path(output.name)
+        try:
+            output.write(source)
+            output.close()
+            temporary.replace(archive)
+        finally:
+            temporary.unlink(missing_ok=True)
     record = {key: selected[key] for key in ('commit', 'release', 'run_id', 'run_attempt')}
     record.update(at=timestamp(), sha256=manifest['sha256'])
     write_json(STATE / 'attempt.json', record)

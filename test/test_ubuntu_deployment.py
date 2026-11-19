@@ -192,6 +192,29 @@ class UbuntuSafetyTests(unittest.TestCase):
             self.assertIn(SHA, json.loads((state / 'blocked.json').read_text()))
             self.assertEqual(budget.read_text(), 'unchanged-budget')
 
+    def test_completed_update_metadata_is_recovered_without_redeploying(self):
+        if sys.platform != 'linux':
+            self.skipTest('Requires Linux symlinks.')
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            state = root / 'deploy-state'
+            state.mkdir()
+            release_name = 'git-' + SHA
+            (root / 'current').symlink_to('releases/' + release_name)
+            (state / 'installed.json').write_text(json.dumps({'commit': 'b' * 40, 'release': 'old'}))
+            (state / 'attempt.json').write_text(json.dumps({'commit': SHA, 'release': release_name}))
+            api = FakeGitHub()
+            with patch.object(deploy, 'STATE', state), patch.object(deploy, 'ROOT', root), \
+                    patch.object(deploy.subprocess, 'run') as docker:
+                docker.return_value.returncode = 0
+                docker.return_value.stdout = 'floorflow:' + release_name + '|healthy\n'
+                deploy.poll(api)
+                self.assertEqual(docker.call_count, 1)
+                self.assertEqual(docker.call_args.args[0][0:2], ['docker', 'inspect'])
+            self.assertEqual(api.downloads, 0)
+            self.assertEqual(json.loads((state / 'installed.json').read_text())['commit'], SHA)
+            self.assertFalse((state / 'attempt.json').exists())
+
     def test_packager_excludes_runtime_budget_and_credentials(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
