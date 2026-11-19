@@ -63,9 +63,10 @@ and rotate the shared credential/restart the app when access should end.
 | `HOST` | Optional IP address/localhost override; defaults to `0.0.0.0` in production and `127.0.0.1` locally |
 | `PREVIEW_USERNAME`, `PREVIEW_PASSWORD` | Required production shared preview credentials |
 | `TRUST_PROXY` | Comma-separated actual ingress IPs/CIDRs; `loopback` only if ingress actually connects over loopback |
+| `PROXY_DIAGNOSTICS` | Optional `on`/`off`, default off. Bounded metadata for marked `GET /health` probes only; no authentication bypass. See the [M6C operator guide](APPSERVICE_DEPLOYMENT.md). |
 | `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` | Normal runtime database connection, separate from AI and administrative accounts |
 | `PGSSLMODE` | Production requires `verify-full`; leave blank for local Docker |
-| `AI_PGUSER`, `AI_PGPASSWORD` | Dedicated `floorflow_ai` login; see [role setup](ASSISTANT.md#local-read-only-login-setup) |
+| `AI_PGUSER`, `AI_PGPASSWORD` | Blank for the initial M6C REST-only deployment; dedicated `floorflow_ai` credentials are only needed for a separately approved AI stage |
 | `AZURE_FOUNDRY_ENDPOINT`, `AZURE_FOUNDRY_MODEL`, `AZURE_FOUNDRY_API_KEY` | Required only to enable real model calls, after explicit approval |
 
 `npm start` uses Node 24's `--env-file-if-exists=.env`; a file is optional and
@@ -88,7 +89,9 @@ The local Compose initialization account is a superuser: **do not deploy it**.
 Provision a separate non-owner, non-admin runtime login with only CONNECT,
 schema USAGE and SELECT on the four application tables, and a separate AI login.
 An administrator must apply/review the AI role setup; it is not a startup task.
-Actual managed PostgreSQL TLS and least-privilege runtime provisioning remain M6 work.
+The operator reports managed PostgreSQL provisioning/TLS were separately verified
+before M6C. The web app's own connection still needs verification after approved
+deployment. Do not rerun database installation during deployment.
 
 Health probes also require authentication and HTTPS; agree a supported protected
 probe configuration in M6. No anonymous health exception is implemented.

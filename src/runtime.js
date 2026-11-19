@@ -42,5 +42,9 @@ export function readRuntimeConfig(env = process.env) {
       }
     }
   }
-  return { port, host, trustedProxies, preview: { username, password, requireHttps: production } };
+  if (env.PROXY_DIAGNOSTICS && !['off', 'on'].includes(env.PROXY_DIAGNOSTICS)) {
+    throw new Error('PROXY_DIAGNOSTICS must be off or on.');
+  }
+  return { port, host, trustedProxies, diagnoseProxy: env.PROXY_DIAGNOSTICS === 'on',
+    preview: { username, password, requireHttps: production } };
 }

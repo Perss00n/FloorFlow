@@ -4,8 +4,9 @@ import { createCustomerRouter } from './routes/customers.js';
 import { createOrderRouter } from './routes/orders.js';
 import { createAssistantRouter } from './routes/assistant.js';
 import { previewAuth } from './preview-auth.js';
+import { proxyDiagnostics } from './proxy-diagnostics.js';
 
-export function createApp(database, assistant = null, { preview, trustedProxies = false } = {}) {
+export function createApp(database, assistant = null, { preview, trustedProxies = false, diagnoseProxy = false } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', trustedProxies);
@@ -17,6 +18,7 @@ export function createApp(database, assistant = null, { preview, trustedProxies 
     });
     next();
   });
+  if (diagnoseProxy) app.use(proxyDiagnostics());
   // Protect everything, including health, static files, errors, and the AI route.
   app.use(previewAuth(preview));
 

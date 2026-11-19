@@ -1,4 +1,42 @@
-# Azure deployment plan (M6B; simplified bootstrap preparation)
+# Azure deployment plan (M6C; manual App Service preparation)
+
+## Current M6C status — 2026-11-19
+
+The operator reports PostgreSQL is installed and separately verified: correct
+schema/seed, independent restricted app/AI accounts and TLS 1.3. **Do not run
+database Install/setup/seed again.** This is operator-supplied evidence; M6C
+preparation did not reconnect to Azure or decrypt credentials.
+
+The current web deployment guide is
+[APPSERVICE_DEPLOYMENT.md](APPSERVICE_DEPLOYMENT.md): explicit package allowlist,
+Linux Node 24 production dependencies, manual Azure CLI/Entra deployment,
+existing app DPAPI credential, separate preview access and AI disabled. Startup
+stays `node src/server.js`, with host-supplied PORT and verified PostgreSQL TLS.
+An opt-in bounded proxy diagnostic supports later actual ingress inspection;
+it does not bypass production HTTPS or authentication. Actual proxy addresses
+and forwarded-header handling remain unverified until approved publication.
+
+No app publication, Azure configuration/resource/logging/firewall change,
+database mutation, paid inference or automatic deployment is part of this
+preparation. Existing GitHub Actions stays CI-only. No commit/push was performed.
+
+Local M6C validation: **302/302 tests passed**, zero failures/skips (298 existing
+plus 4 focused deployment regressions). All database tests used the loopback
+development database with real-model settings blanked. JavaScript syntax passed
+for **45 files**. All three operator scripts parsed in **Windows PowerShell 5.1**;
+synthetic HTTP/JSON primitives were checked without sending requests. The settings
+and Azure HTTP scripts themselves have not been executed against Azure.
+
+The reviewed package built successfully with **88 locked production packages**
+using local Docker/Linux **Node 24.22.3, x64**; runtime imports and disabled-AI
+configuration passed without network access. The ZIP contains **33 explicitly
+allowed project files**, plus dependencies (**5,106 entries**, **7,562,311 bytes**).
+All 33 source entries matched the current working-copy bytes. Exclusion checks
+passed; package/report are Git-ignored under `.tmp`, and only the ZIP is deployable.
+Prepared ZIP SHA256: `2B68F56A1ECB4F36C512F4C8C1370FE13775DACA8D935035F3B8E8A40AC78B8B`.
+This is an uncommitted review artifact, not a GitHub CI artifact or live deployment.
+
+## Earlier M6B bootstrap preparation (historical; superseded by installed DB)
 
 Review date: **2026-11-19**. Stage 4 provisioned the approved infrastructure in
 Sweden Central. **FloorFlow has not been deployed, the database has not been
@@ -551,6 +589,8 @@ Sources: [Azure users and administrator privileges](https://learn.microsoft.com/
 | Health | Keep `/health` protected. The platform's built-in probe cannot satisfy custom Basic auth as implemented. Initially leave it unconfigured and perform authenticated HTTPS readiness checks on demand. A bare 401 is an access-gate check, not database readiness. Any later platform-token solution must validate the documented internal token and network trust, be narrowly scoped to health, and receive separate review/tests; do not add anonymous access. |
 | Restarts | Test SIGTERM/process restart, ten-second shutdown deadline, both pools closing, cold-start DB failure/recovery, and preview authentication after restart. Expect in-flight AI interruption and reset process-local budgets. |
 
+For M6C, follow the current manual guide and leave all AI/model credentials blank.
+The general future configuration below does not authorize AI activation.
 The code's production guards remain unchanged. Configure server-only
 `PREVIEW_USERNAME`, a long random `PREVIEW_PASSWORD`, verified `TRUST_PROXY`,
 the five normal `PG*` connection variables, `PGSSLMODE`, and separate `AI_PG*`.
@@ -567,7 +607,11 @@ Sources: [Node hosting](https://learn.microsoft.com/en-us/azure/app-service/conf
 [protected health probes](https://learn.microsoft.com/en-us/azure/app-service/monitor-instances-health-check).
 See also [platform warm-up settings](https://learn.microsoft.com/en-us/azure/app-service/reference-app-settings).
 
-## Eventual deployment pipeline (M6B only)
+## Eventual automatic deployment pipeline (future; outside M6C)
+
+M6C uses the existing operator's Entra login and manual deployment only. The
+identity/workflow proposal below is historical planning for a separately
+approved future stage, not instructions to implement now.
 
 Extend CI with a separate deployment job that has `needs: test` and runs only
 when `github.event_name == 'push' && github.ref == 'refs/heads/main'`. Pull requests
@@ -609,20 +653,17 @@ documents the identity and app-scoped role. No deployment job exists.
    model/version/SKU, database configuration, Linux F1 plan, Node 24 stack, HTTPS
    and narrow database firewall. Verify delayed free-meter application/costs as
    usage arrives; do not upgrade or change spending limits automatically.
-3. **Next stage, approval required:** follow the simplified
-   [operator guide](POSTGRESQL_BOOTSTRAP.md): separately authorize narrow temporary
-   access if required, run read-only Check, review results before Install, then
-   initialize once under admin ownership and verify both SELECT-only accounts.
-   Preserve existing credentials, logging error/user-override and the 8192 kB
-   temp limit. Remove temporary access afterward. Do not run the full development
-   test suite against Azure or delete unexpected partial state.
-4. Configure server-only application/preview secrets, production host/port and
-   foreground startup. Verify actual ingress/narrow proxy trust, HTTPS Basic auth,
-   database certificate validation, protected health and safe startup/shutdown
-   before sharing. No app credentials are configured yet.
-5. After separate approval, add the narrowly scoped OIDC identity and deployment
-   job; deploy the CI-proven artifact and test main-only deployment, failed-CI
-   blocking, PR non-deployment and code rollback.
+3. **Database completed, operator-reported at M6C start:** installed and separately
+   verified with restricted runtime accounts, deterministic seed and TLS 1.3.
+   Do not rerun Install. Preserve credentials, logging error/user-override and
+   temp_file_limit 8192 kB; do not run the development test suite against Azure.
+4. **Prepared only, approval required:** follow the current
+   [manual App Service guide](APPSERVICE_DEPLOYMENT.md), configure runtime/preview
+   secrets from the existing app credential, publish the reviewed allowlist ZIP
+   through CLI/Entra, observe actual ingress before trusting one narrow proxy,
+   and verify protected pages/health/REST in the new runtime. AI stays disabled.
+5. Automatic OIDC/GitHub deployment is deferred. Do not create an identity or
+   change the current CI workflow as part of the first manual publication.
 6. Keep model access disabled until its approved configuration/evaluation stage.
    Then review exact network access and server-only model credentials, obtain
    explicit paid-call approval, and run [AZURE_ACCEPTANCE.md](AZURE_ACCEPTANCE.md).
