@@ -1,13 +1,30 @@
-# Azure deployment plan (M6B Stage 4; infrastructure provisioned)
+# Azure deployment plan (M6B; simplified bootstrap preparation)
 
-Review date: **2026-11-18**. Stage 4 provisioned the approved infrastructure in
+Review date: **2026-11-19**. Stage 4 provisioned the approved infrastructure in
 Sweden Central. **FloorFlow has not been deployed, the database has not been
 initialized, and no model inference was performed.** No billing upgrade,
 deployment identity or deployment workflow was created. The repository remains
-private; application code and tests are unchanged. These documentation changes
-have not been committed or pushed by this stage.
+private. Application code and the 264 original tests are unchanged; preparation
+adds focused installation tests. Local changes have not been committed or pushed.
 
-## Stage 5 preflight: bootstrap blocked before execution
+**Current status:** two operator bootstrap attempts failed without confirmed
+persistent database changes: first at logging SET, then `create_roles` with
+`0LP01` and acknowledged rollback. Actual state must be checked again. The new
+[POSTGRESQL_BOOTSTRAP.md](POSTGRESQL_BOOTSTRAP.md) is the only current bootstrap
+guide: admin owns the database/tables, two independent SELECT-only users reuse
+existing DPAPI credentials, and Check must be reviewed before Install. The
+operator reports **8192 kB** temp limit and logging **error / user-override**;
+preserve both. No Azure connection, credential decryption, bootstrap, deployment,
+logging/firewall change or inference occurred during this simplification.
+
+Local preparation: **298/298 tests passed** (264 original + 6 inspection + 28
+new bootstrap regressions), plus 12 focused read-only SELECTs on local PostgreSQL
+18.7. Bootstrap DDL was not executed. Live Azure state/permissions/TLS/limits
+remain unverified. Earlier Stage 5B paragraphs below are retained as historical
+preparation evidence; their owner-role and temporary-logging instructions are
+superseded and must not be followed. Earlier **-1** temp limits are historical.
+
+## Stage 5 preflight: bootstrap blocked before execution (historical)
 
 On **2026-11-18**, read-only Azure checks confirmed the expected active
 subscription, Ready PostgreSQL **18** server, original **13 exact application-IP
@@ -51,6 +68,70 @@ tests and syntax checks are recorded in the runbook. Await the operator's
 sanitized results and cleanup confirmation before designing the Azure bootstrap.
 The bootstrap outline below remains an earlier plan, not a reviewed executable
 procedure or proof of managed-provider permissions.
+
+## Stage 5B: earlier bootstrap preparation (historical; superseded)
+
+The operator reports Stage 5A succeeded: verified TLS 1.3, PostgreSQL 18.6,
+administrator CREATEDB/CREATEROLE without SUPERUSER, no `floorflow` database or
+proposed roles, and no truncated inspection results. The local sanitized report
+was not available during preparation; these are operator-supplied observations.
+They supersede the earlier statement that SQL capabilities were wholly uninspected,
+but do not prove Azure's ownership/GRANT operations will succeed.
+
+Use [POSTGRESQL_BOOTSTRAP.md](POSTGRESQL_BOOTSTRAP.md), the reviewed
+`scripts/bootstrap-azure-db.ps1` wrapper and `scripts/bootstrap-azure-db.js` client.
+This is a prepared manual procedure, **not an executed bootstrap**. It creates a
+non-login owner, separate SELECT-only application/AI logins and unchanged seed,
+with verified TLS and sanitized evidence. It refuses existing database/roles
+and does not recover partial state automatically. The separate reviewed Azure
+CLI logging commands and Portal firewall changes are operator-only. The operator
+reports `temp_file_limit=8192` is already configured; retain that protection.
+
+Preparation used no Azure connection, credential import, resource/firewall/parameter
+change, deployment or model inference. Application code/schema/seed and dependencies
+are unchanged. Await sanitized Bootstrap/Verify results and original-13-rule cleanup
+confirmation before proceeding. The old bootstrap outline later in this file is
+historical; the dedicated Stage 5B runbook is the current executable procedure.
+
+The first operator bootstrap stopped safely at preflight with
+`LOGGING_PERMISSION_REQUIRED`, `partialChangesPossible: false`, verified TLS and
+no created database, roles, schema or seed. Azure's non-superuser administrator
+cannot SET LOCAL this logging parameter. The operator's separate read-only CLI
+check reported `log_min_error_statement=error`, writable/dynamic, no pending
+restart and `panic` allowed. Its original **source must still be captured**.
+
+The compatibility fix removes session logging SET and requires the actual SQL
+session's effective `panic` plus all existing statement/duration/sampling/bind/audit
+protections before persistent phases, in the new target session, immediately
+before each SCRAM verifier transmission and before initialization COMMIT. Missing,
+unsafe or unreadable values fail closed. Initial `public` ownership is inspected:
+Azure's documented
+`azure_pg_admin` ownership is transferred by the administrator before SET ROLE
+owner. PostgreSQL 18 syntax/transaction boundaries were reviewed against primary
+references without executing bootstrap SQL. The reviewed checkout is main at
+`44c8217`, with this modified document and four untracked bootstrap/runbook/test
+files; it is intentionally uncommitted, not a clean GitHub-main checkout.
+
+The runbook separately documents the operator-only enable and restore CLI commands,
+a durable pre-change value/source baseline, finally restoration after success or
+failure, interruption recovery, and a final independent readback. The documented
+default-source reset omits both --value and --source; a user override restores the
+saved value explicitly. Exact source must be checked, including Azure's provider
+normalization behavior. This temporarily suppresses ERROR/FATAL statement text
+**server-wide**; normal error messages remain enabled and `log_min_messages` is
+unchanged. Concurrent reloads between check and transmission, PANIC statement logs
+and provider-internal diagnostics remain residual exposure risks. Coordinate an
+exclusive parameter-change interval. Rollback/disconnect cannot restore this
+server parameter. No broader logging changes or extra SQL privileges are allowed.
+
+The full local suite passed **362/362 tests** (264 application, 6 inspection,
+92 bootstrap), with model settings disabled and existing database tests pinned
+to local PostgreSQL. Bootstrap tests use fakes; no real bootstrap SQL or Azure
+connection occurred. Syntax/PowerShell AST/whitespace and repository secret-pattern
+checks passed after reviewing synthetic test fixtures. The focused bootstrap
+and inspection run passed **98/98**. No credential was decrypted and no
+commit/push occurred. This fix is prepared for operator review/execution; it
+does not establish live Azure bootstrap or logging-restoration success.
 
 ## Verified Stage 4 resources
 
@@ -398,7 +479,12 @@ Sources: [Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-man
 [Linux App Service pricing](https://azure.microsoft.com/en-us/pricing/details/app-service/linux/),
 [PostgreSQL stop behavior](https://learn.microsoft.com/en-us/azure/postgresql/configure-maintain/how-to-stop-server).
 
-## Managed PostgreSQL bootstrap: required M6B work
+## Managed PostgreSQL bootstrap: earlier M6B outline (historical; superseded)
+
+**Use [POSTGRESQL_BOOTSTRAP.md](POSTGRESQL_BOOTSTRAP.md) for current preparation.**
+The older owner-role, psql and parameter-change outline below is retained only
+as history. Admin now owns the objects, existing credentials are reused, and
+server logging and the already configured 8192 kB limit must stay unchanged.
 
 **Do not assume `npm run db:assistant:setup` can run unchanged on Azure.** The
 local Docker administrator is a superuser. Azure's administrator is a member of
@@ -523,13 +609,13 @@ documents the identity and app-scoped role. No deployment job exists.
    model/version/SKU, database configuration, Linux F1 plan, Node 24 stack, HTTPS
    and narrow database firewall. Verify delayed free-meter application/costs as
    usage arrives; do not upgrade or change spending limits automatically.
-3. **Next stage, approval required:** temporarily permit one trusted bootstrap IP,
-   connect using verified PostgreSQL TLS, create the dedicated database/owner and
-   separate least-privilege application/AI roles, and initialize schema/seed once.
-   Adapt the managed-provider script and set/verify the 8192 kB temp-file limit.
-   Check exact seed totals and independent AI permission/resource limits using
-   focused checks. Remove temporary network access afterward. Do not run the full
-   development test suite against Azure.
+3. **Next stage, approval required:** follow the simplified
+   [operator guide](POSTGRESQL_BOOTSTRAP.md): separately authorize narrow temporary
+   access if required, run read-only Check, review results before Install, then
+   initialize once under admin ownership and verify both SELECT-only accounts.
+   Preserve existing credentials, logging error/user-override and the 8192 kB
+   temp limit. Remove temporary access afterward. Do not run the full development
+   test suite against Azure or delete unexpected partial state.
 4. Configure server-only application/preview secrets, production host/port and
    foreground startup. Verify actual ingress/narrow proxy trust, HTTPS Basic auth,
    database certificate validation, protected health and safe startup/shutdown
