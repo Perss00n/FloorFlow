@@ -1,5 +1,14 @@
 # FloorFlow: riktad undersökning av sju AI-fel, 19 november 2026
 
+**Historisk rapport för release 08.** Den senare godkända felsökningsomgången
+publicerade release 09 efter tolv lyckade slutmodelltester och tre publika
+eftertester. [Aktuell acceptansrapport](AI_RELIABILITY_ACCEPTANCE_2026-11-19.md)
+bevarar alla nya frågor, felorsaker, kostnader och begränsningar.
+
+Senare [lokal analys av den obefintliga kunden](AI_MISSING_CUSTOMER_ANALYSIS_2026-11-19.md)
+prövar manuella SQL-varianter och förbereder ett ej applicerat promptförslag.
+Den analysen använder noll nya modellförfrågningar och ändrar inte produktion.
+
 Uppföljning av test **4, 5, 6, 7, 8, 13 och 16** i
 [den första kvalitetsrapporten](AI_QUALITY_REVIEW_2026-11-19.md). De ursprungliga
 resultaten är historik och ändras inte retroaktivt. Utgångspunkt är commit

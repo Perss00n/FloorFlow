@@ -1,5 +1,10 @@
 # FloorFlow: AI-kvalitet och belastning, 19 november 2026
 
+**Senare slutlig uppföljning:** release 09 har godkänd riktad acceptans med
+tolv slutmodelltester och tre publika eftertester. Se
+[AI_RELIABILITY_ACCEPTANCE](AI_RELIABILITY_ACCEPTANCE_2026-11-19.md).
+Nedanstående resultat gäller den ursprungliga omgången och är historik.
+
 **Senare uppföljning:** se [den riktade felundersökningen](AI_FAILURE_INVESTIGATION_2026-11-19.md)
 för nya reproduktioner, bekräftad tokenexhaustion, ROUND(...,3)-avvisning och
 separata ändringar i releaserna 06–08. Nedanstående 20 testresultat är den

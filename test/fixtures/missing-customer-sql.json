@@ -1,0 +1,136 @@
+{
+  "origin": "Manually constructed SQL; not captured from a real model response.",
+  "cases": [
+    {
+      "id": "aggregate",
+      "name": "INNER JOIN, WHERE and ungrouped aggregate",
+      "allowed": true,
+      "sql": "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "on_filter",
+      "name": "LEFT JOIN with additional status condition in ON",
+      "allowed": false,
+      "reason": "ON must be one declared FK equality, not AND",
+      "sql": "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c LEFT JOIN public.orders AS o ON o.customer_id = c.id AND o.status = 'completed' LEFT JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings'",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "case",
+      "name": "Conditional SUM using CASE",
+      "allowed": false,
+      "reason": "CASE expressions are outside the allowlist",
+      "sql": "SELECT ROUND(COALESCE(SUM(CASE WHEN o.status = 'completed' THEN ROUND(oi.quantity * oi.unit_price, 2) ELSE 0 END), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings'",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "filter",
+      "name": "SUM with FILTER",
+      "allowed": false,
+      "reason": "Aggregate FILTER is not an allowed call property",
+      "sql": "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)) FILTER (WHERE o.status = 'completed'), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings'",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "cte",
+      "name": "CTE wrapping the aggregate",
+      "allowed": false,
+      "reason": "WITH is outside the supported single SELECT form",
+      "sql": "WITH spending AS (SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed') SELECT total_spent_sek FROM spending",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "scalar",
+      "name": "Scalar subquery with zero fallback",
+      "allowed": false,
+      "reason": "Top-level FROM is required and subqueries are unsupported",
+      "sql": "SELECT COALESCE((SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'), 0.00) AS total_spent_sek",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "precision_cast",
+      "name": "NUMERIC cast with precision and scale",
+      "allowed": false,
+      "reason": "Only bare NUMERIC casts are supported",
+      "sql": "SELECT CAST(ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS NUMERIC(12,2)) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "left_join",
+      "name": "LEFT JOIN with only FK equalities",
+      "allowed": true,
+      "sql": "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c LEFT JOIN public.orders AS o ON o.customer_id = c.id LEFT JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "grouped",
+      "name": "GROUP BY with no matching customer",
+      "allowed": true,
+      "sql": "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed' GROUP BY c.id, c.name",
+      "expected": []
+    },
+    {
+      "id": "decimal_zero",
+      "name": "Decimal zero inside COALESCE",
+      "allowed": true,
+      "sql": "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0.00), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    },
+    {
+      "id": "null_sum",
+      "name": "SUM without COALESCE returns NULL",
+      "allowed": true,
+      "sql": "SELECT SUM(ROUND(oi.quantity * oi.unit_price, 2)) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'",
+      "expected": [{ "total_spent_sek": null }]
+    },
+    {
+      "id": "constant_zero",
+      "name": "Invented constant zero without a spending dependency",
+      "allowed": false,
+      "reason": "Output must depend on application data",
+      "sql": "SELECT 0.00 AS total_spent_sek FROM public.customers AS c LIMIT 1",
+      "expected": [
+        {
+          "total_spent_sek": "0.00"
+        }
+      ]
+    }
+  ]
+}

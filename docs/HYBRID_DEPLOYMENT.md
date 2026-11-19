@@ -5,11 +5,12 @@ PostgreSQL och den verkliga GPT-5-mini-modellen finns kvar i Azure. App Service
 används inte av denna installation. Äldre M6-/App Service-dokument beskriver
 tidigare förberedelser och är inte driftinstruktionen för den här demon.
 
-Senast publicerat: **20261119-08**, med förtydligad mängd-SQL och
-`reasoning_effort=low`. Se [den riktade felundersökningen](AI_FAILURE_INVESTIGATION_2026-11-19.md):
-sex av sju tidigare misslyckade frågor har lyckade omtester, men obefintlig kund
-ger fortfarande 422. **AI-acceptansen är inte godkänd.** Den tidigare breda
-omgångens 20 frågor finns oförändrade i [kvalitetsrapporten](AI_QUALITY_REVIEW_2026-11-19.md).
+Senast publicerat: **20261119-09**. Den slutliga promptens tolv modelltester
+och tre publika eftertester passerade, inklusive obefintlig kund med `0.00 SEK`
+i Chrome. Se [AI_RELIABILITY_ACCEPTANCE](AI_RELIABILITY_ACCEPTANCE_2026-11-19.md)
+för samtliga 42 journalförda modellförsök i omgången, de upptäckta affärsfelen och exakt
+verifieringsomfattning. Riktad acceptans är godkänd för de redovisade fallen.
+Tidigare rapporter är historik och bevisar ingen allmän felfrihet hos modellen.
 
 ## Arkitektur och avgränsning
 
@@ -175,7 +176,11 @@ behöver hållas öppen. Befintlig cloudflared publicerar åter routen efter sin
   och `alias.kolumn`, aldrig `schema.tabell.kolumn`. Ändra inte valideringen för
   att släppa igenom en avvisad fråga.
   Release 07 förtydligar också SUM utan ROUND för mängder: ROUND med precision 3
-  stöds inte. Frågor om obefintlig kund har fortfarande ett känt 422-fel.
+  stöds inte. Release 09 instruerar enstaka namngiven kunds totalsumma med
+  INNER JOIN, enbart FK-jämförelse i ON, filter i WHERE och COALESCE utan GROUP BY.
+  Kundnamn matchas med LOWER på båda sidor; artikelbeskrivningar med ILIKE-
+  substring och explicit SKU exakt. Ett nytt 422 ska diagnostiseras före
+  exekvering; ersätt aldrig felet med en hårdkodad nolla.
 - **429:** vänta enligt `Retry-After`. Gränserna är **12 giltiga frågeförsök per
   klient-IP/60 s, 100 modellstarter per UTC-kalendertimme, 200 per UTC-dygn,
   två aktiva arbeten och högst fyra väntande i FIFO-kö i högst fem sekunder**.
@@ -233,23 +238,23 @@ avvisas för separat granskning. `config/runtime.env` ligger utanför releaserna
 Tidigare image/källkod och `.env` bevaras. Vid fel efter bytet försöker skriptet
 återställa föregående release. Den automatiska felåterställningsgrenen har inte
 provocerats i drift. Den normala uppdateringsvägen har körts till frisk release
-**20261119-08**. Den första uppdateringens referens finns i
+**20261119-09**. Den första uppdateringens referens finns i
 `backups/update-20261119-02/previous-release.txt` och `release.env`.
 
-Manuell återgång från 08 till bevarad release 07, med samma budget-/köskydd:
+Manuell återgång från 09 till bevarad release 08, med samma budget-/köskydd:
 
 ```bash
 cd /home/marcus/apps/floorflow
-sudo ln -s releases/20261119-07 .current-restore
+sudo ln -s releases/20261119-08 .current-restore
 sudo mv -Tf .current-restore current
-sudo sed -i 's/^FLOORFLOW_RELEASE=.*/FLOORFLOW_RELEASE=20261119-07/' .env
+sudo sed -i 's/^FLOORFLOW_RELEASE=.*/FLOORFLOW_RELEASE=20261119-08/' .env
 sudo docker compose up -d --no-build --wait app
 ```
 
 Kontrollera därefter healthy, autentiserad publik frontend och API. Låt Compose,
 runtime-konfiguration och `state/ai-usage.json` vara kvar. Releaser före 04 saknar
-de nya gränserna. Release 07 återgår till standard-reasoning och kan åter ge de
-tidigare length-felen. Compose ändrades separat och säkerhetskopierades vid 04, eftersom
+de nya gränserna. Release 08 har low-reasoning men saknar de senaste reglerna för
+kundsummor och namn-/beskrivningsmatchning. Compose ändrades separat och säkerhetskopierades vid 04, eftersom
 den manuella uppdateraren avsiktligt avvisar en ändrad Compose-fil. Ingen ny
 deployment-automatik installerades. Uppdateraren inkluderar inte dokumentation;
 driftguiderna förvaras separat i serverns `docs/`.
@@ -262,11 +267,19 @@ gemensamma tunneln. Windows-reservdemon är bevarad och stoppades inte.
 
 ## Verifiering och återstående gränser
 
-Senaste riktade felundersökningen gäller release **20261119-08**:
-322 lokala tester och 30 publika HTTP-kontroller passerade; sex av sju
-ursprungsfall har lyckade omtester och obefintlig kund har fortfarande 422.
-Se [felundersökningen](AI_FAILURE_INVESTIGATION_2026-11-19.md) för exakta
-bevisgränser, modellmetadata och den redovisade överträdelsen av anropsbudgeten.
+Senaste riktade acceptansen gäller release **20261119-09**:
+338 lokala tester och 30 publika HTTP-kontroller passerade. Alla tolv riktiga
+modelltester med slutprompten samt två publika API-test och ett Chrome-test
+passerade; belopp, enheter och relevant SQL bedömdes enligt facit. SQL-validator,
+databaslager, roller, TLS, proxy trust, rate limits och brandvägg behölls.
+Totalt 42 modellförsök användes efter användarens uttryckliga utökning från 30
+till 42; uppskattad tokenkostnad 0,04533 USD. Ingen automatisk retry gjordes.
+Se [acceptansrapporten](AI_RELIABILITY_ACCEPTANCE_2026-11-19.md) för alla utfall,
+inklusive två HTTP-200/operatörs-200-svar med felaktig nolla före sista ändringen.
+
+Föregående release-08-felsökning finns i
+[felundersökningen](AI_FAILURE_INVESTIGATION_2026-11-19.md); dess fel och
+budgetöverträdelse är historik och har inte skrivits om.
 
 Föregående breda genomgång, slutlig release **20261119-05**:
 

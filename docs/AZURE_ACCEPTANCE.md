@@ -1,5 +1,15 @@
 # Real Azure model acceptance checklist
 
+**Latest targeted acceptance, release 20261119-09:** the final prompt passed
+12 real model cases plus two public API checks and one real Chrome check.
+The missing customer returned a calculated `0.00 SEK`. The user explicitly
+extended this round's budget from 30 to 42 before attempt 31; exactly 42 were
+used, estimated token cost USD 0.04533. See the
+[complete acceptance journal](AI_RELIABILITY_ACCEPTANCE_2026-11-19.md) for exact
+questions, intermediate failures, business semantics and verification limits.
+The older reviews below remain historical; the checklist is broader than this
+finite targeted suite. SQL validation, database roles and security stayed unchanged.
+
 **Later targeted follow-up:** release `20261119-08` uses an explicit low
 reasoning effort and a quantity-only prompt clarification. Six of the seven
 previous failing questions have successful targeted retests; the missing-customer

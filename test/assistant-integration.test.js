@@ -49,6 +49,13 @@ test('captured oak query without unsupported rounding preserves 118.500 m² unde
   assert.deepEqual(result.results, [{ total_engineered_oak_m2: '118.500' }]);
 });
 
+test('captured exact article-description matching loses the variant while ILIKE preserves the oak total', async () => {
+  const sql = "SELECT COALESCE(SUM(oi.quantity), 0) AS engineered_oak_m2 FROM public.orders AS o INNER JOIN public.order_items AS oi ON oi.order_id = o.id INNER JOIN public.articles AS a ON oi.article_id = a.id WHERE o.status = 'completed' AND LOWER(a.name) = LOWER('engineered oak flooring') AND a.unit = 'm²'";
+  assert.deepEqual((await executeReadQuery(readPool, sql)).results, [{ engineered_oak_m2: '0' }]);
+  const substring = sql.replace("LOWER(a.name) = LOWER('engineered oak flooring')", "a.name ILIKE '%engineered oak flooring%'");
+  assert.deepEqual((await executeReadQuery(readPool, substring)).results, [{ engineered_oak_m2: '118.500' }]);
+});
+
 test('a supported missing-customer aggregate returns exact zero under the same unchanged validator and role', async () => {
   const sql = "SELECT ROUND(COALESCE(SUM(ROUND(oi.quantity * oi.unit_price, 2)), 0), 2) AS total_spent_sek FROM public.customers AS c INNER JOIN public.orders AS o ON o.customer_id = c.id INNER JOIN public.order_items AS oi ON oi.order_id = o.id WHERE c.name = 'Imaginary Moonbase Holdings' AND o.status = 'completed'";
   const result = await executeReadQuery(readPool, sql);

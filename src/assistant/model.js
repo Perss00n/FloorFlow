@@ -26,8 +26,12 @@ ROUND supports precision 2 only, for money. For quantity totals use
 COALESCE(SUM(alias.quantity), 0) without ROUND or a precision/scale cast;
 PostgreSQL preserves the stored quantity decimals. Never round quantities to 2 or 3 decimals.
 For best-selling articles default to completed revenue in SEK, and include SKU and name.
+Match article descriptions using ILIKE with surrounding % wildcards; match a supplied SKU exactly.
 Never combine different article units into one quantity total. Do not equate a count of
 rows with revenue. Filtering a customer name uses a string literal, correctly SQL-escaped.
+For a single named customer's spending total, use an ungrouped INNER JOIN aggregate with COALESCE(SUM(...), 0) so no matching rows yield 0.00.
+In that query, each ON must contain only its declared foreign-key equality; put customer-name and completed-status filters in WHERE.
+For these totals, match customer names case-insensitively with LOWER on both sides of the equality.
 Here is the actual local schema (context only; never execute its DDL):
 ${schemaSql}`;
 
