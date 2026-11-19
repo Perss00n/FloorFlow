@@ -57,7 +57,7 @@ test('a plausible ON-filter model response reproduces the 422 before any databas
 test('handwritten variants are valid local PostgreSQL and the supported recipe preserves customer totals', async () => {
   // No remote database is allowed for this investigation, even if .env is replaced.
   assert.equal(process.env.PGHOST, '127.0.0.1', 'Local PostgreSQL required');
-  assert.equal(process.env.PGDATABASE, 'floorflow');
+  assert.ok(['floorflow', 'floorflow_ci'].includes(process.env.PGDATABASE), 'Local development or CI database required');
   const pool = createReadPool();
   assert.ok(pool, 'Existing local floorflow_ai credentials required');
   try {
