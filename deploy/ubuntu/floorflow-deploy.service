@@ -8,6 +8,7 @@ Requires=docker.service
 Type=oneshot
 User=root
 UMask=0077
+Environment=DOCKER_CONFIG=/var/lib/floorflow-deploy/docker
 ExecStart=/usr/bin/python3 /usr/local/lib/floorflow/deploy.py --deploy
 TimeoutStartSec=12min
 TimeoutStopSec=120s

@@ -249,6 +249,8 @@ kontrollera diskutrymmet vid längre drift.
 - `/home/marcus/apps/floorflow/update.sh`: samma granskade updaterare för manuell användning.
 - `/etc/systemd/system/floorflow-deploy.{service,timer}`: separata root-ägda enheter.
 - `/var/lib/floorflow-deploy/installed.json`: senast lyckade commit, release, CI-run och SHA-256.
+- `docker/` i samma skyddade katalog: tjänstens separata Docker/Buildx-klientcache;
+  tjänsten behöver inte skriva i `/root` eller ändra befintliga Docker-klientinställningar.
 - `previous.json`: föregående lyckade installationsmetadata; `blocked.json`: nekade commits.
 - `attempt.json`: pågående försök; `paused`: beständig operatörspaus.
 - Baslinjebackup före automatiken: `backups/cicd-20261119/`. Release 09 behålls.
