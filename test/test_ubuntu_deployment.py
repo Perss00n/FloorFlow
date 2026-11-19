@@ -251,6 +251,7 @@ class UpdaterTests(unittest.TestCase):
         code = code.replace('/home/marcus/apps/floorflow', str(self.root))
         code = code.replace('/run/lock/floorflow-update.lock', str(self.root / 'update.lock'))
         code = code.replace('/usr/local/lib/floorflow/release.py', str(ROOT / 'deploy/ubuntu/release.py'))
+        code = code.replace('/var/lib/floorflow-deploy/paused', str(self.root / 'paused'))
         code = code.replace('[[ $EUID -eq 0 ]]', '[[ 0 -eq 0 ]]')
         (self.root / 'update.sh').write_text(code)
         fake = self.root / 'bin/docker'
@@ -323,6 +324,17 @@ exit 0
             result = self.invoke()
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / 'docker.log').exists())
+        self.assert_preserved()
+
+    def test_manual_rollback_requires_pause_and_restores_previous_release(self):
+        self.assertEqual(self.invoke().returncode, 0)
+        command = ['bash', str(self.root / 'update.sh'), '--rollback']
+        env = {**os.environ, 'FF_TEST_ROOT': str(self.root), 'PATH': str(self.root / 'bin') + ':' + os.environ['PATH']}
+        self.assertNotEqual(subprocess.run(command, env=env, capture_output=True).returncode, 0)
+        self.assertEqual(os.readlink(self.root / 'current'), 'releases/new')
+        (self.root / 'paused').touch()
+        result = subprocess.run(command, env=env, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
         self.assert_preserved()
 
 
