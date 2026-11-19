@@ -6,7 +6,7 @@ import { createAssistantRouter } from './routes/assistant.js';
 import { previewAuth } from './preview-auth.js';
 import { proxyDiagnostics } from './proxy-diagnostics.js';
 
-export function createApp(database, assistant = null, { preview, trustedProxies = false, diagnoseProxy = false } = {}) {
+export function createApp(database, assistant = null, { preview, trustedProxies = false, diagnoseProxy = false, assistantBudget } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', trustedProxies);
@@ -33,7 +33,7 @@ export function createApp(database, assistant = null, { preview, trustedProxies 
 
   app.use('/api/customers', createCustomerRouter(database));
   app.use('/api/orders', createOrderRouter(database));
-  app.use('/api/assistant', createAssistantRouter(assistant));
+  app.use('/api/assistant', createAssistantRouter(assistant, Date.now, { budget: assistantBudget }));
 
   const publicDirectory = fileURLToPath(new URL('../public/', import.meta.url));
   app.use(express.static(publicDirectory, { dotfiles: 'ignore' }));

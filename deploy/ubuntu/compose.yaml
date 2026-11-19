@@ -8,6 +8,10 @@ services:
     env_file:
       - path: ./config/runtime.env
         format: raw
+    environment:
+      AI_BUDGET_FILE: /app/state/ai-usage.json
+    volumes:
+      - ./state:/app/state
     ports:
       - "127.0.0.1:3302:3000"
     restart: unless-stopped

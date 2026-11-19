@@ -87,7 +87,7 @@ test('missing choices, null choices and unexpected tool calls are malformed resp
   assert.equal(await generateSql(noTools, 'test', 'question'), null);
 });
 
-for (const failure of [{ name: 'APIConnectionTimeoutError', expected: 504 }, { name: 'TimeoutError', expected: 504 }, { status: 401, expected: 503 }, { status: 403, expected: 503 }, { status: 429, expected: 503 }, { status: 500, expected: 503 }]) {
+for (const failure of [{ name: 'APIConnectionTimeoutError', expected: 504 }, { name: 'TimeoutError', expected: 504 }, { status: 401, expected: 503 }, { status: 403, expected: 503 }, { status: 429, expected: 429 }, { status: 500, expected: 503 }]) {
   test(`model failure ${failure.name ?? failure.status} is safe and is not retried`, async () => {
     let calls = 0;
     const client = { chat: { completions: { async create() { calls += 1; throw Object.assign(new Error('secret-key and private provider details'), failure); } } } };

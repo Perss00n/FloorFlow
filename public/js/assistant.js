@@ -1,4 +1,5 @@
 import { formatMoney } from './format.js';
+import { readAssistantReply } from './api.js';
 
 const form = document.getElementById('assistant-form');
 const input = document.getElementById('assistant-question');
@@ -75,7 +76,7 @@ form.addEventListener('submit', async (event) => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: question }), signal: AbortSignal.timeout(35000),
     });
-    const data = await response.json();
+    const data = await readAssistantReply(response);
     if (!response.ok) {
       addMessage('Assistant unavailable', typeof data.error === 'string' ? data.error : 'Please try again later.');
       return;

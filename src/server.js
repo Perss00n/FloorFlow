@@ -15,7 +15,7 @@ try {
   startupStage = 'assistant';
   configured = configureAssistant();
   startupStage = 'application';
-  const app = createApp(pool, configured.assistant, runtime);
+  const app = createApp(pool, configured.assistant, { ...runtime, assistantBudget: configured.budget });
   startupStage = 'listening';
   server = app.listen(runtime.port, runtime.host);
   await once(server, 'listening');

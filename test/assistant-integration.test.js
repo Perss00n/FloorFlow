@@ -261,29 +261,37 @@ test('unexpected internal errors are hidden', async (context) => {
 test('per-IP request limits cannot be bypassed by spoofing forwarded headers', async (context) => {
   let calls = 0;
   const url = await startApp(context, { async chat() { calls += 1; return { answer: 'Test-only result' }; } });
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < 12; index += 1) {
     assert.equal((await post(url, { message: 'question' }, { headers: { 'X-Forwarded-For': `192.0.2.${index}` } })).status, 200);
   }
   const rejected = await post(url, { message: 'question' }, { headers: { 'X-Forwarded-For': '192.0.2.99' } });
   assert.equal(rejected.status, 429);
   assert.ok(rejected.headers.has('retry-after'));
-  assert.equal(calls, 5);
+  assert.equal(calls, 12);
 });
 
-test('only one model request may be in flight at a time', async (context) => {
+test('two model requests can be in flight and a third waits for a slot', async (context) => {
   let release;
   let markStarted;
   const started = new Promise((resolve) => { markStarted = resolve; });
   const gate = new Promise((resolve) => { release = resolve; });
-  const url = await startApp(context, { async chat() { markStarted(); await gate; return { answer: 'Test-only result' }; } });
+  let calls = 0;
+  const url = await startApp(context, { async chat() { calls += 1; if (calls === 2) markStarted(); await gate; return { answer: 'Test-only result' }; } });
   const first = post(url, { message: 'first question' });
+  const second = post(url, { message: 'second question' });
   await started;
+  let third;
   try {
-    assert.equal((await post(url, { message: 'second question' })).status, 429);
+    third = post(url, { message: 'third question' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(calls, 2);
   } finally {
     release();
   }
   assert.equal((await first).status, 200);
+  assert.equal((await second).status, 200);
+  assert.equal((await third).status, 200);
+  assert.equal(calls, 3);
 });
 
 test('the global hourly budget still applies when per-minute windows reset', async (context) => {
@@ -295,13 +303,13 @@ test('the global hourly budget still applies when per-minute windows reset', asy
   await once(server, 'listening');
   context.after(() => new Promise((resolve) => server.close(resolve)));
   const url = `http://127.0.0.1:${server.address().port}`;
-  for (let minute = 0; minute < 6; minute += 1) {
+  for (let minute = 0; minute < 9; minute += 1) {
     time = minute * 61000;
-    for (let request = 0; request < 5; request += 1) assert.equal((await post(url, { message: 'question' })).status, 200);
+    for (let request = 0; request < (minute === 8 ? 4 : 12); request += 1) assert.equal((await post(url, { message: 'question' })).status, 200);
   }
   time += 61000;
   assert.equal((await post(url, { message: 'question' })).status, 429);
-  assert.equal(calls, 30);
+  assert.equal(calls, 100);
   time = 3600001;
   assert.equal((await post(url, { message: 'question' })).status, 200);
 });

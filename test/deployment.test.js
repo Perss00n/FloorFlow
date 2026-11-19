@@ -35,7 +35,7 @@ test('optional proxy diagnostics emit only bounded metadata and never reflect ar
   for (let i = 0; i < 20; i++) middleware(request, {}, () => { nextCalls++; });
   assert.equal(logs.length, 12);
   assert.equal(nextCalls, 20);
-  assert.deepEqual(logs[0], { event: 'floorflow-proxy-probe', probe: 'baseline', peer: '127.0.0.1', socketTls: false, forwardedProto: 'other' });
+  assert.deepEqual(logs[0], { event: 'floorflow-proxy-probe', probe: 'baseline', peer: '127.0.0.1', clientId: 'unknown', cloudflareClientMatches: false, ray: 'unknown', socketTls: false, forwardedProto: 'other' });
   assert.doesNotMatch(JSON.stringify(logs), /secret|Authorization|Cookie/);
   const ignored = proxyDiagnostics(() => assert.fail('Unrecognized requests must not be logged'));
   ignored({ ...request, path: '/api/customers' }, {}, () => {});

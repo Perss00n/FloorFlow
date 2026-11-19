@@ -61,6 +61,11 @@ export async function generateSql(client, model, question) {
       },
     }, { signal: AbortSignal.timeout(20000) });
   } catch (error) {
+    if (error?.status === 429) {
+      const seconds = Number(error.headers?.get?.('retry-after'));
+      const delay = Number.isFinite(seconds) && seconds > 0 ? Math.min(3600, Math.ceil(seconds)) : 60;
+      throw new AssistantError(429, 'The AI service is temporarily rate limited. Please wait before trying again.', delay);
+    }
     if (error instanceof OpenAI.APIConnectionTimeoutError || error instanceof OpenAI.APIUserAbortError
       || ['APIConnectionTimeoutError', 'TimeoutError', 'AbortError'].includes(error?.name)) {
       throw new AssistantError(504, 'The AI service took too long to respond. Please try again later.');

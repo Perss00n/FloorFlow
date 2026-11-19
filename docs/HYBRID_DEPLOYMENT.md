@@ -5,6 +5,11 @@ PostgreSQL och den verkliga GPT-5-mini-modellen finns kvar i Azure. App Service
 används inte av denna installation. Äldre M6-/App Service-dokument beskriver
 tidigare förberedelser och är inte driftinstruktionen för den här demon.
 
+Senast publicerat: **20261119-05**, efter AI-kvalitetsgenomgången. Läs
+[AI-kvalitetsrapporten](AI_QUALITY_REVIEW_2026-11-19.md) för exakt alla 20 riktiga
+modelltester: **13 godkända, fem 502 och två 422**. Driftförbättringarna är
+verifierade, men AI-assistenten är inte fullt acceptansgodkänd.
+
 ## Arkitektur och avgränsning
 
 ```text
@@ -22,7 +27,13 @@ Webbläsare -- HTTPS --> Cloudflare -- krypterad befintlig tunnel --> Ubuntu
   värdvolym, Docker-socket eller SSH-route hör till FloorFlow.
 - Processen körs som `node`, med skrivskyddat filsystem, en liten `/tmp`, inga
   Linux-capabilities, `no-new-privileges`, 256 MiB minnesgräns och loggrotation
-  (3 × 5 MB). Högst en instans ska köras med den nuvarande minnesbaserade limiteringen.
+  (3 × 5 MB). Kör exakt en instans: klienträknare och kö är processlokala;
+  den globala tim-/dygnsbudgeten har separat beständig lagring.
+- Egen bind mount `./state:/app/state`: ägare 1000:1000, katalog 0700 och
+  räknarfil 0600. Den innehåller bara antal och UTC-tidsfönster, inga kunduppgifter
+  eller IP-adresser. `AI_BUDGET_FILE=/app/state/ai-usage.json` sätts i Compose.
+  Nollställ/radera inte filen vid uppdatering eller rollback. Den återanvänder
+  inga Laravel-volymer. Root-filsystemet är fortsatt skrivskyddat.
 - `restart: unless-stopped`; Docker och befintlig cloudflared är boot-aktiverade.
 - Laravel, dess Compose-nät/volymer, `.env.server`, deployment-skript och timer
   återanvänds inte. Inga Laravel-containrar stoppades eller byggdes om.
@@ -63,8 +74,10 @@ Befintligt abonnemang och resursgrupp `rg-floorflow-demo` är oförändrade.
 
 - PostgreSQL: `pg-floorflow-demo-6e9587.postgres.database.azure.com:5432`,
   databas `floorflow`, version 18. TLS verifierar CA-kedja och värdnamn.
-- Ny PostgreSQL-regel: `floorflow-ubuntu-home`, endast
-  **81.235.27.27–81.235.27.27**. De tidigare App Service-reglerna bevarades.
+- Enda PostgreSQL-regeln: `floorflow-ubuntu-home`, endast
+  **81.235.27.27–81.235.27.27**. Vid kvalitetsgenomgången identifierades de 13
+  äldre singletonreglerna mot gamla App Services outbound-lista, sparades för
+  återställning och togs bort. Ingen Azure-resurs raderades.
 - OpenAI: `oai-floorflow-demo-6e9587`; befintlig deployment `floorflow-sql`,
   `gpt-5-mini` / `2025-08-07`, GlobalStandard, befintlig kapacitet 10.
 - Endpoint: `https://oai-floorflow-demo-6e9587.openai.azure.com/openai/v1/`.
@@ -73,6 +86,9 @@ Befintligt abonnemang och resursgrupp `rg-floorflow-demo` är oförändrade.
 - OpenAI ändrades från `publicNetworkAccess=Disabled`, default `Deny`, inga IP-regler,
   till **Enabled + defaultAction=Deny + exakt IP-regeln 81.235.27.27**.
   Inga tillåtande nätverksintervall eller Azure-services-bypass lades till.
+- Deploymentens återlästa kvoter är **10 requests/min och 10 000 tokens/min**.
+  Appens 12/minut per klient kan därför inte garantera 12 lyckade modellsvar.
+  Kapacitet, modell, prompt, SQL-allowlist och roller ändrades inte i denna genomgång.
 
 Den publika IP-adressen verifierades från Ubuntu före ändringen. Om internet-
 leverantören ändrar den slutar databas/AI att fungera. Läs då den nya adressen
@@ -155,9 +171,21 @@ behöver hållas öppen. Befintlig cloudflared publicerar åter routen efter sin
   Modellinstruktionen förtydligades i release `20261119-03`: använd tabellalias
   och `alias.kolumn`, aldrig `schema.tabell.kolumn`. Ändra inte valideringen för
   att släppa igenom en avvisad fråga.
-- **429:** vänta enligt `Retry-After`. Nuvarande gränser: ett samtidigt anrop,
-  fem per klient/minut och 30 totalt/timme. Räknarna är processlokala och nollställs
-  vid omstart; kör inte flera repliker utan separat gemensam limitering.
+- **429:** vänta enligt `Retry-After`. Gränserna är **12 giltiga frågeförsök per
+  klient-IP/60 s, 100 modellstarter per UTC-kalendertimme, 200 per UTC-dygn,
+  två aktiva arbeten och högst fyra väntande i FIFO-kö i högst fem sekunder**.
+  Personer bakom samma NAT delar klientgränsen. Full/utgången kö ger 429 utan
+  modellstart; giltiga försök räknas ändå mot minutgränsen. Tim-/dygnsräknare
+  överlever omstart i `state/ai-usage.json`. UTC-dygn byts 01:00 svensk vintertid,
+  02:00 sommartid. Provider-429 ger en gemensam paus enligt begränsad Retry-After,
+  utan automatiska retries. Klienten visar väntetiden. Kör inte flera repliker.
+- **AI 503 med usage budget unavailable:** kontrollera `state`-katalogens ägare,
+  filrättigheter och innehållets format utan att nollställa räknarna. Återställ
+  senaste bevarade korrekta räknarfil vid korruption. Vanliga webb-API fungerar
+  även när AI-budgetfilen inte kan läsas/skrivas.
+- **AI 502/icke-JSON:** fem av 20 verkliga modelltester gav detta fel; grundorsaken
+  är inte fastställd. Klienten visar nu ett sanerat tjänstefel och kan återanvändas.
+  Ett misslyckat startat modellanrop förbrukar fortfarande global budget.
 - **AI 503/504:** kontrollera den specifika OpenAI-IP-regeln, endpoint,
   deployment-namn och tillgänglig kredit. Ingen automatisk reservmodell används.
 
@@ -196,18 +224,25 @@ avvisas för separat granskning. `config/runtime.env` ligger utanför releaserna
 Tidigare image/källkod och `.env` bevaras. Vid fel efter bytet försöker skriptet
 återställa föregående release. Den automatiska felåterställningsgrenen har inte
 provocerats i drift. Den normala uppdateringsvägen har körts till frisk release
-**20261119-02**. Referensen före den uppdateringen finns i
+**20261119-05**. Den första uppdateringens referens finns i
 `backups/update-20261119-02/previous-release.txt` och `release.env`.
 
-Manuell återgång till den bevarade första releasen:
+Manuell återgång från 05 till bevarad release 04, med samma budget-/köskydd:
 
 ```bash
 cd /home/marcus/apps/floorflow
-sudo ln -s releases/20261119-01 .current-restore
+sudo ln -s releases/20261119-04 .current-restore
 sudo mv -Tf .current-restore current
-sudo cp backups/update-20261119-02/release.env .env
+sudo sed -i 's/^FLOORFLOW_RELEASE=.*/FLOORFLOW_RELEASE=20261119-04/' .env
 sudo docker compose up -d --no-build --wait app
 ```
+
+Kontrollera därefter healthy, autentiserad publik frontend och API. Låt Compose,
+runtime-konfiguration och `state/ai-usage.json` vara kvar. Releaser före 04 saknar
+de nya gränserna. Compose ändrades separat och säkerhetskopierades vid 04, eftersom
+den manuella uppdateraren avsiktligt avvisar en ändrad Compose-fil. Ingen ny
+deployment-automatik installerades. Uppdateraren inkluderar inte dokumentation;
+driftguiderna förvaras separat i serverns `docs/`.
 
 Full avveckling: stoppa bara FloorFlow, ta bort bara dess hostname/CNAME i
 Cloudflare och regeln `floorflow-ubuntu-home` i PostgreSQL. Återställ vid behov
@@ -216,6 +251,40 @@ att ingen annan ny konsument behöver regeln. Radera inga Azure-resurser eller d
 gemensamma tunneln. Windows-reservdemon är bevarad och stoppades inte.
 
 ## Verifiering och återstående gränser
+
+Aktuell genomgång, slutlig release **20261119-05**:
+
+- **317/317 lokala tester**, noll överhoppade, och syntaxkontroll av 49 JS-filer.
+- Före publicering: autentiserade Ubuntu-kontroller; efter: 30 publika
+  HTTP-kontroller från Windows. Externa HTTPS-prober från två olika AS-nät i
+  Sverige och USA nådde inloggningsskyddet. Authentiserad riktig Chrome visade
+  Harbor Office Studio och korrekt 109000.00 SEK från verklig modell.
+- Förfalskad X-Forwarded-For ändrade inte Express klient-IP för de två externa
+  näten. Bara HMAC-fingeravtryck loggades; diagnostiken är nu avstängd. Samma
+  uttryckliga TRUST_PROXY gäller. Vissa kombinerade spoofheaders stoppades av
+  Cloudflare före appen och räknas som edge-skydd, inte test av appens parsing.
+- PostgreSQL och OpenAI har återlästs med endast serverns exakta utgående IP.
+  Ingen giltig backend-inloggning skickades från tredjepartsnät; externa OpenAI-
+  prober utan nyckel gav 401 och bevisar inte nätspärr efter autentisering.
+- App-pool max 10, AI-pool max 2, PostgreSQL max_connections 50. Ett isolerat
+  loopbackprov med stubbad modell och riktiga read-only SQL-läsningar tog emot
+  100 samtidiga försök: sex slutförda, 94 förväntade 429, aldrig fler än två aktiva.
+  AI-poolen hade noll väntande anslutningar. Detta är inte 100 riktiga AI-anrop.
+- Två riktiga samtidiga modellfrågor lyckades. Tim-/dygnsfilen behölls exakt vid
+  containeråterskapning och separat uppdatering 04→05. Laravel-identiteter,
+  starttider och skyddade filhashar var oförändrade. Tunneln fortsatte köras.
+- **20 riktiga frågor: 13 godkända, fem 502, två 422.** Alla returnerade belopp
+  matchade oberoende Azure-facit och relevant SQL granskades affärsmässigt.
+  Legitima mängdfrågor för oak fungerar ännu inte tillförlitligt. Ingen SQL-regel
+  försvagades. Uppskattad tokenkostnad cirka **0,04068 USD**, inte fakturerat belopp.
+- Inget långt belastningsprov, ingen hel VM-omstart eller avsiktlig live-
+  uttömning av Azure-kvoten. Windows-reservdemon bevarades. Se kvalitetsrapporten
+  för exakta frågor, fel, SQL, tokenunderlag och skillnader mellan bevisnivåerna.
+
+### Historik från den ursprungliga hybridinstallationen
+
+Följande avser tidigare releaser och de tidigare lägre gränserna. Aktuella
+värden och resultat står ovan.
 
 - **304/304 lokala Node-tester** passerade mot befintlig lokal utvecklingsdatabas,
   med externa AI-inställningar tomma. Dessa tester är inte körda mot Azure.

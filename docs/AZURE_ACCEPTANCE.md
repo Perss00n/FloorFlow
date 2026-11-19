@@ -1,19 +1,34 @@
 # Real Azure model acceptance checklist
 
-**Not executed.** M1–M5 use mocks/intercepted SDK transport and local PostgreSQL.
-Run this checklist only after explicit approval for paid calls, with a chosen
-Azure Foundry deployment, a small agreed request budget, and the unchanged seed
-in a dedicated test database. Never use a production customer database.
+**Live review executed on 2026-11-19; not fully accepted.** The approved budget
+was exactly 20 real questions: **13 passed, five returned non-JSON HTTP 502,
+and two legitimate oak-quantity questions returned validation HTTP 422**.
+See [the complete report](AI_QUALITY_REVIEW_2026-11-19.md) for every exact question,
+normalized SQL, returned values, semantic assessment, failures, and token cost.
+The tests used only reads against the existing Azure demo seed. No role, model,
+prompt, SQL allowlist, migration, seed, or security-policy change was made.
+
+The real model was `floorflow-sql`, GPT-5-mini `2025-08-07`. Model questions ran
+against Ubuntu release `20261119-04`; final release `20261119-05` adds only
+client error handling. It received no additional model calls. Azure metrics
+show a difference of 21,337 prompt and 17,675 output tokens, approximately
+**USD 0.04068 at indicative model list prices**, not a verified Azure invoice.
+One accepted customer-ranking question was rendered and inspected in Chrome.
+
+M1–M5 automated tests still use mocks/intercepted transport and local PostgreSQL.
+Any further real calls require a new explicit budget. Preserve the real failures;
+valid SQL alone does not establish correct business meaning. The checklist below
+remains a reusable acceptance specification, not a claim that every item passed.
 
 ## Record evidence
 
-- [ ] Record date, source commit, deployment/model version, configured endpoint
+- [x] Record date, source commit, deployment/model version, configured endpoint
   hostname (no key), prompt version, question, HTTP status, generated normalized
   SQL and returned values. Placeholders in displayed SQL omit bound strings;
   inspect filters through controlled tests/source when values need verification.
-- [ ] Confirm the deployment accepts Chat Completions, strict JSON schema, and
+- [x] Confirm the deployment accepts Chat Completions, strict JSON schema, and
   `max_completion_tokens`; verify successful live rendering in the browser.
-- [ ] Independently execute the reference SQL in `db/verify.sql`. A successful
+- [x] Independently execute the reference SQL in `db/verify.sql`. A successful
   parse or a plausible English sentence does not count as a correct answer.
 
 ## Unchanged seed: semantic acceptance

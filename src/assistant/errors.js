@@ -1,6 +1,7 @@
 export class AssistantError extends Error {
-  constructor(status, message) {
+  constructor(status, message, retryAfter) {
     super(message);
     this.status = status;
+    this.retryAfter = retryAfter;
   }
 }

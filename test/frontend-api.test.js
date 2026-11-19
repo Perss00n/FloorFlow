@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fetchJson, getPageId } from '../public/js/api.js';
+import { fetchJson, getPageId, readAssistantReply } from '../public/js/api.js';
 
 test('page IDs are read through URLSearchParams and preserve valid integer strings', () => {
   assert.equal(getPageId('?id=1'), '1');
@@ -45,4 +45,23 @@ test('network failures reject so pages can display their error state', async (co
 test('invalid JSON rejects so pages do not silently render a malformed response', async (context) => {
   context.mock.method(globalThis, 'fetch', async () => new Response('not JSON'));
   await assert.rejects(fetchJson('/api/customers'), SyntaxError);
+});
+
+test('AI gateway HTML errors produce a safe useful message instead of a misleading connection error', async () => {
+  const result = await readAssistantReply(new Response('<html>private gateway details and visitor address</html>', { status: 502 }));
+  assert.match(result.error, /rephrase your question/);
+  assert.doesNotMatch(result.error, /private|visitor|html/);
+});
+
+test('AI throttling displays only a bounded numeric Retry-After delay', async () => {
+  const result = await readAssistantReply(Response.json({ error: 'The assistant is busy.' }, { status: 429, headers: { 'Retry-After': '5' } }));
+  assert.match(result.error, /wait 5 seconds/);
+  const invalid = await readAssistantReply(Response.json({ error: 'The assistant is busy.' }, { status: 429, headers: { 'Retry-After': 'private-value' } }));
+  assert.doesNotMatch(invalid.error, /private-value/);
+});
+
+test('AI successful JSON keeps exact decimals and malformed successful replies still fail closed', async () => {
+  const data = { results: [{ total_sek: '285415.00' }] };
+  assert.deepEqual(await readAssistantReply(Response.json(data)), data);
+  await assert.rejects(readAssistantReply(new Response('invalid JSON', { status: 200 })), SyntaxError);
 });

@@ -8,6 +8,7 @@ COPY --chown=node:node src ./src
 COPY --chown=node:node public ./public
 # The assistant reads this schema as context; it is never executed at startup.
 COPY --chown=node:node db/init/01-schema.sql ./db/init/01-schema.sql
+RUN mkdir -p /app/state && chown node:node /app/state
 USER node
 EXPOSE 3000
 CMD ["node", "src/server.js"]
